@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0f172a;
+      --surface:    #1e293b;
+      --surface2:   #263348;
+      --border:     #334155;
+      --text:       #f1f5f9;
+      --muted:      #94a3b8;
+      --dim:        #64748b;
+      --accent:     #6366f1;
+      --accent-dim: rgba(99, 102, 241, 0.12);
+      --accent-border: rgba(99, 102, 241, 0.5);
+      --success:    #10b981;
+      --success-dim: rgba(16, 185, 129, 0.12);
+      --danger:     #ef4444;
+      --warning:    #f59e0b;
+      --warning-dim: rgba(245, 158, 11, 0.12);
+      --radius:     12px;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      padding: 0 0 48px;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+
+    .header-inner {
+      max-width: 560px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .date-display {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    .mode-selector {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .mode-pill {
+      padding: 5px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-pill:hover { border-color: var(--accent); color: var(--text); }
+
+    .mode-pill.active[data-mode="build"]   { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mode-pill.active[data-mode="operate"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mode-pill.active[data-mode="recover"] { background: var(--warning); border-color: var(--warning); color: #1a1a1a; }
+
+    /* ── LAYOUT ── */
+    .app-body {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 20px 16px 0;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+
+    .section-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 14px;
+    }
+
+    .section-note {
+      font-size: 0.75rem;
+      color: var(--dim);
+      font-style: italic;
+      margin-top: -10px;
+      margin-bottom: 14px;
+    }
+
+    .section-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .section-header-row .section-label { margin-bottom: 0; }
+
+    /* ── INPUTS ── */
+    .input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      padding: 10px 12px;
+      transition: border-color 0.15s;
+      outline: none;
+      display: block;
+    }
+
+    .input::placeholder { color: var(--dim); }
+    .input:focus { border-color: var(--accent); }
+
+    /* ── TODAY SECTION ── */
+    .must-win-wrapper { margin-bottom: 12px; }
+
+    .field-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .must-win-input {
+      background: var(--accent-dim) !important;
+      border: 1.5px solid var(--accent-border) !important;
+      border-left: 3px solid var(--accent) !important;
+      font-size: 1rem !important;
+      font-weight: 600;
+      padding: 12px 14px !important;
+      border-radius: 10px !important;
+    }
+
+    .must-win-input:focus { border-color: var(--accent) !important; }
+
+    .secondary-wrapper { display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── BASELINE SECTION ── */
+    .baseline-list { list-style: none; }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 0;
+      cursor: pointer;
+      font-size: 0.95rem;
+      color: var(--text);
+      user-select: none;
+      transition: color 0.15s;
+    }
+
+    .checkbox-label:hover { color: var(--text); }
+
+    .checkbox-label input[type="checkbox"] { display: none; }
+
+    .checkbox-box {
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      font-size: 12px;
+    }
+
+    .checkbox-label input[type="checkbox"]:checked ~ .checkbox-box {
+      background: var(--success);
+      border-color: var(--success);
+    }
+
+    .checkbox-label input[type="checkbox"]:checked ~ .checkbox-box::after {
+      content: "✓";
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .checkbox-label input[type="checkbox"]:checked ~ .checkbox-text {
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: var(--dim);
+    }
+
+    /* ── PROJECTS SECTION ── */
+    .project-count {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 10px;
+    }
+
+    .project-count.at-limit { color: var(--warning); border-color: var(--warning); }
+
+    .projects-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+
+    .project-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .project-item-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .project-name-input {
+      flex: 1;
+      background: transparent !important;
+      border: none !important;
+      border-bottom: 1px solid var(--border) !important;
+      border-radius: 0 !important;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 4px 0 !important;
+      color: var(--text);
+    }
+
+    .project-name-input:focus { border-bottom-color: var(--accent) !important; outline: none; }
+
+    .project-action-input {
+      font-size: 0.82rem !important;
+      color: var(--muted) !important;
+      background: transparent !important;
+      border: none !important;
+      border-bottom: 1px solid transparent !important;
+      border-radius: 0 !important;
+      padding: 4px 0 !important;
+    }
+
+    .project-action-input::placeholder { color: var(--dim) !important; }
+    .project-action-input:focus { border-bottom-color: var(--border) !important; outline: none; }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 2px 4px;
+      line-height: 1;
+      border-radius: 4px;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-remove:hover { color: var(--danger); }
+
+    .btn-add {
+      width: 100%;
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-family: inherit;
+      padding: 9px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+    .btn-add:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .limit-note {
+      font-size: 0.72rem;
+      color: var(--warning);
+      text-align: center;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .limit-note.visible { display: block; }
+
+    /* ── WAITING FOR ── */
+    .waiting-list { list-style: none; margin-bottom: 10px; }
+
+    .waiting-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .waiting-item:last-child { border-bottom: none; }
+
+    .waiting-item span { flex: 1; }
+
+    .waiting-empty {
+      font-size: 0.8rem;
+      color: var(--dim);
+      font-style: italic;
+      padding: 4px 0 12px;
+    }
+
+    /* ── THIS WEEK ── */
+    .week-wins { display: flex; flex-direction: column; gap: 12px; }
+
+    .week-win-item { display: flex; flex-direction: column; gap: 5px; }
+
+    .week-empty {
+      font-size: 0.8rem;
+      color: var(--dim);
+      font-style: italic;
+    }
+
+    /* ── END-OF-DAY SCORE ── */
+    .eod-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .eod-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-family: inherit;
+      font-weight: 500;
+      padding: 10px 4px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .eod-btn:hover { border-color: var(--muted); }
+
+    .eod-icon {
+      display: block;
+      font-size: 1.2rem;
+      margin-top: 4px;
+    }
+
+    .eod-btn.done {
+      background: var(--success-dim);
+      border-color: var(--success);
+      color: var(--text);
+    }
+
+    .eod-btn.bad {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: var(--danger);
+      color: var(--text);
+    }
+
+    /* ── BASELINE EDITABLE ── */
+    .baseline-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .baseline-row:last-of-type { border-bottom: none; }
+
+    .baseline-checkbox-label {
+      flex: 1;
+      padding: 0;
+      gap: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    .baseline-label-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      border-radius: 0;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+      padding: 0;
+      width: auto;
+      display: inline-block;
+      outline: none;
+      transition: border-color 0.15s;
+      cursor: text;
+    }
+
+    .baseline-label-input:focus { border-bottom-color: var(--border); }
+
+    /* ── RITUALS ── */
+    .ritual-list { display: flex; flex-direction: column; }
+
+    .ritual-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .ritual-row:last-of-type { border-bottom: none; }
+    .ritual-row.inactive { opacity: 0.55; }
+
+    .ritual-check {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      color: transparent;
+      padding: 0;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .ritual-check.checked {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+    .ritual-check.disabled {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .ritual-label {
+      flex: 1;
+      min-width: 100px;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      border-radius: 0;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      padding: 4px 0;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .ritual-label::placeholder { color: var(--dim); }
+    .ritual-label:focus { border-bottom-color: var(--border); }
+    .ritual-row.checked .ritual-label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+
+    .day-chips { display: flex; gap: 3px; flex-shrink: 0; }
+
+    .day-chip {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      font-size: 0.62rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.15s;
+    }
+    .day-chip:hover { border-color: var(--accent); color: var(--text); }
+    .day-chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .day-chip.today {
+      box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 2.5px var(--muted);
+    }
+    .day-chip.today.active {
+      box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 2.5px var(--accent);
+    }
+
+    .ritual-empty {
+      font-size: 0.8rem;
+      color: var(--dim);
+      font-style: italic;
+      padding: 8px 0 4px;
+    }
+
+    @media (max-width: 460px) {
+      .day-chip { width: 20px; height: 20px; font-size: 0.58rem; }
+      .day-chips { gap: 2px; }
+      .ritual-label { min-width: 70px; font-size: 0.85rem; }
+    }
+
+    /* ── BASELINE SUB-ITEMS ── */
+    .baseline-row-controls {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .baseline-child-count {
+      font-size: 0.7rem;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+      margin-right: 4px;
+    }
+
+    .baseline-expand-btn {
+      background: none;
+      border: none;
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 4px 6px;
+      line-height: 1;
+      border-radius: 4px;
+      transition: color 0.15s, transform 0.2s;
+    }
+    .baseline-expand-btn:hover { color: var(--text); }
+    .baseline-expand-btn.open { transform: rotate(90deg); color: var(--text); }
+
+    .baseline-children {
+      padding: 2px 0 10px 30px;
+      margin-bottom: 2px;
+    }
+
+    .baseline-row-child { padding: 7px 0; }
+    .baseline-row-child .checkbox-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 5px;
+    }
+    .baseline-row-child .baseline-label-input {
+      font-size: 0.85rem;
+    }
+
+    .btn-add-child {
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-family: inherit;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 6px;
+    }
+    .btn-add-child:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 400px) {
+      .eod-btn { font-size: 0.65rem; padding: 8px 2px 6px; }
+      .eod-icon { font-size: 1rem; }
+      .mode-pill { padding: 5px 10px; font-size: 0.75rem; }
+    }
+
+    /* ── DAY CLOSE ── */
+    .close-card { margin-bottom: 12px; padding: 0; }
+
+    .btn-submit-day {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+    .btn-submit-day:hover { opacity: 0.92; }
+    .btn-submit-day:active { transform: scale(0.98); }
+
+    .closed-summary {
+      background: var(--success-dim);
+      border: 1px solid var(--success);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .closed-summary-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .closed-summary-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .closed-summary-time { font-size: 0.75rem; color: var(--muted); }
+
+    .btn-reopen {
+      background: transparent;
+      border: 1px solid var(--success);
+      color: var(--success);
+      font-size: 0.78rem;
+      font-weight: 500;
+      font-family: inherit;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-reopen:hover { background: var(--success); color: white; }
+
+    body.day-closed .app-body > .card {
+      opacity: 0.6;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* ── HISTORY DAY STATUS ── */
+    .day-status {
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+    .day-status.submitted {
+      background: var(--success-dim);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .day-status.auto {
+      background: var(--bg);
+      color: var(--dim);
+      border: 1px solid var(--border);
+    }
+    .day-closed-line {
+      font-size: 0.72rem;
+      color: var(--dim);
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* ── HISTORY BUTTON ── */
+    .header-left { display: flex; align-items: center; gap: 10px; }
+
+    .history-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-family: inherit;
+      padding: 4px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .history-btn:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── HISTORY OVERLAY ── */
+    .history-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 100;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .history-overlay.open { opacity: 1; pointer-events: all; }
+
+    .history-panel {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: var(--radius) var(--radius) 0 0;
+      width: 100%;
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+    }
+    .history-overlay.open .history-panel { transform: translateY(0); }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .history-title { font-weight: 600; font-size: 0.9rem; letter-spacing: 0.02em; }
+
+    .history-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .history-close:hover { color: var(--text); }
+
+    .history-scroll { overflow-y: auto; padding: 14px; flex: 1; }
+
+    .history-empty {
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.85rem;
+      font-style: italic;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+
+    /* ── HISTORY EDIT BUTTON ── */
+    .history-edit-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--dim);
+      font-size: 0.7rem;
+      font-weight: 500;
+      font-family: inherit;
+      padding: 3px 9px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .history-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── DAY CARDS ── */
+    .day-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .day-card-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .day-card-hdr:hover { background: var(--surface2); }
+
+    .day-date { font-weight: 600; font-size: 0.88rem; }
+    .day-meta { display: flex; align-items: center; gap: 8px; }
+    .day-eod-mini { font-size: 0.8rem; }
+    .day-chevron { font-size: 0.75rem; color: var(--dim); transition: transform 0.2s; display: inline-block; }
+    .day-card.open .day-chevron { transform: rotate(180deg); }
+
+    .day-detail { display: none; padding: 12px 14px 14px; border-top: 1px solid var(--border); }
+    .day-card.open .day-detail { display: block; }
+
+    .day-must-win { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+    .day-dim { color: var(--dim); font-style: italic; font-weight: 400; font-size: 0.85rem; }
+    .day-secondary { font-size: 0.82rem; color: var(--muted); margin-bottom: 8px; }
+
+    .day-mode-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      text-transform: capitalize;
+      margin-bottom: 4px;
+    }
+    .day-mode-badge.recover { background: var(--warning-dim); border-color: var(--warning); color: var(--warning); }
+
+    .day-section-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin: 10px 0 6px;
+    }
+
+    .day-bl-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 4px; }
+    .day-bl-item { font-size: 0.82rem; color: var(--dim); }
+    .day-bl-item.done { color: var(--success); }
+
+    .day-eod-row { display: flex; gap: 6px; }
+    .day-eod-chip {
+      flex: 1;
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 6px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="header-left">
+        <span class="date-display" id="date-display"></span>
+        <button class="history-btn" id="history-btn">History</button>
+      </div>
+      <div class="mode-selector" id="mode-selector">
+        <button class="mode-pill" data-mode="build">Build</button>
+        <button class="mode-pill" data-mode="operate">Operate</button>
+        <button class="mode-pill" data-mode="recover">Recover</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+
+    <!-- TODAY -->
+    <div class="card">
+      <div class="section-label">Today</div>
+      <div class="must-win-wrapper">
+        <label class="field-label" for="must-win">Must-Win</label>
+        <input class="input must-win-input" id="must-win" type="text" placeholder="The one thing that matters today" autocomplete="off">
+      </div>
+      <div class="secondary-wrapper">
+        <label class="field-label">Secondary</label>
+        <input class="input" id="secondary-1" type="text" placeholder="Secondary task" autocomplete="off">
+        <input class="input" id="secondary-2" type="text" placeholder="Secondary task" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- BASELINE -->
+    <div class="card">
+      <div class="section-label">Baseline</div>
+      <p class="section-note">Even minimum counts.</p>
+      <ul class="baseline-list" id="baseline-list"></ul>
+      <button class="btn-add" id="baseline-add" style="margin-top:8px">+ Add item</button>
+    </div>
+
+    <!-- RITUALS -->
+    <div class="card">
+      <div class="section-label">Rituals</div>
+      <p class="section-note">Recurring commitments — pick the days they apply.</p>
+      <div class="ritual-list" id="ritual-list"></div>
+      <button class="btn-add" id="ritual-add" style="margin-top:10px">+ Add Ritual</button>
+    </div>
+
+    <!-- ACTIVE PROJECTS -->
+    <div class="card">
+      <div class="section-header-row">
+        <div class="section-label" style="margin-bottom:0">Active Projects</div>
+        <span class="project-count" id="project-count">0 / 3</span>
+      </div>
+      <div class="projects-list" id="projects-list"></div>
+      <button class="btn-add" id="add-project">+ Add Project</button>
+      <div class="limit-note" id="limit-note">3 projects maximum — finish one before starting another.</div>
+    </div>
+
+    <!-- WAITING FOR -->
+    <div class="card">
+      <div class="section-label">Waiting For</div>
+      <ul class="waiting-list" id="waiting-list"></ul>
+      <input class="input" id="waiting-input" type="text" placeholder="Waiting on… (press Enter to add)" autocomplete="off">
+    </div>
+
+    <!-- THIS WEEK -->
+    <div class="card">
+      <div class="section-label">This Week</div>
+      <p class="section-note">One concrete win per project.</p>
+      <div class="week-wins" id="week-wins"></div>
+    </div>
+
+    <!-- END-OF-DAY SCORE -->
+    <div class="card">
+      <div class="section-label" style="margin-bottom:14px">End-of-Day Score</div>
+      <div class="eod-grid" id="eod-grid"></div>
+    </div>
+
+    <!-- DAY CLOSE -->
+    <div class="close-card" id="close-card"></div>
+
+  </div>
+
+  <div class="history-overlay" id="history-overlay">
+    <div class="history-panel">
+      <div class="history-header">
+        <span class="history-title">History</span>
+        <button class="history-close" id="history-close">×</button>
+      </div>
+      <div class="history-scroll" id="history-list"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── DATE ──────────────────────────────────────────────────────────────────
+    const TODAY = new Date().toISOString().slice(0, 10);
+
+    const DAYS   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const d = new Date();
+    document.getElementById("date-display").textContent =
+      `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+
+    // ── STORAGE KEYS ──────────────────────────────────────────────────────────
+    const K = {
+      mode:         `tt_mode_${TODAY}`,
+      mustWin:      `tt_mustwin_${TODAY}`,
+      secondary:    `tt_secondary_${TODAY}`,
+      baseline:     `tt_baseline_${TODAY}`,
+      eod:          `tt_eod_${TODAY}`,
+      ritualsCheck: `tt_rituals_${TODAY}`,
+      closed:       `tt_closed_${TODAY}`,
+      projects:      "tt_projects",
+      waiting:       "tt_waiting",
+      weekWins:      "tt_weekwins",
+      baselineItems: "tt_baseline_items",
+      rituals:       "tt_rituals",
+    };
+
+    function load(key, fallback) {
+      try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback; }
+      catch { return fallback; }
+    }
+
+    function save(key, val) {
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+    }
+
+    // ── STATE ─────────────────────────────────────────────────────────────────
+    const state = {
+      mode:      load(K.mode, null),
+      mustWin:   load(K.mustWin, ""),
+      secondary: load(K.secondary, ["", ""]),
+      baselineItems: load(K.baselineItems, [
+        { id: "work",      label: "Work" },
+        { id: "vitamins",  label: "Vitamins" },
+        { id: "creatine",  label: "Creatine" },
+        { id: "gymCardio", label: "Gym / Cardio" },
+        { id: "reading",   label: "Reading" },
+        { id: "connect",   label: "Connect" },
+      ]),
+      baseline:  load(K.baseline, {}),
+      eod:       load(K.eod, { body: null, work: null, project: null, mind: null, people: null }),
+      projects:  load(K.projects, []),
+      waiting:   load(K.waiting, []),
+      weekWins:  load(K.weekWins, {}),
+      rituals:      load(K.rituals, []),
+      ritualsCheck: load(K.ritualsCheck, {}),
+      closed:       load(K.closed, null),
+    };
+
+    // ── AUTO-CLOSE PAST UNCLOSED DAYS ─────────────────────────────────────────
+    (function autoClosePast() {
+      const datePat = /^tt_mustwin_(\d{4}-\d{2}-\d{2})$/;
+      Object.keys(localStorage).forEach(k => {
+        const m = k.match(datePat);
+        if (m && m[1] !== TODAY) {
+          const ck = `tt_closed_${m[1]}`;
+          if (localStorage.getItem(ck) === null) {
+            localStorage.setItem(ck, JSON.stringify({ at: null, auto: true }));
+          }
+        }
+      });
+    })();
+
+    // ── PRUNE OLD DAILY KEYS ──────────────────────────────────────────────────
+    (function pruneOldKeys() {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 365);
+      const pat = /^tt_(mode|mustwin|secondary|baseline|eod|rituals|closed)_(\d{4}-\d{2}-\d{2})$/;
+      Object.keys(localStorage).forEach(k => {
+        const m = k.match(pat);
+        if (m && new Date(m[2]) < cutoff) localStorage.removeItem(k);
+      });
+    })();
+
+    // ── MODE SELECTOR ─────────────────────────────────────────────────────────
+    document.querySelectorAll(".mode-pill").forEach(pill => {
+      if (state.mode === pill.dataset.mode) pill.classList.add("active");
+      pill.addEventListener("click", () => {
+        const mode = pill.dataset.mode;
+        if (state.mode === mode) { state.mode = null; }
+        else { state.mode = mode; }
+        save(K.mode, state.mode);
+        document.querySelectorAll(".mode-pill").forEach(p =>
+          p.classList.toggle("active", p.dataset.mode === state.mode)
+        );
+      });
+    });
+
+    // ── TODAY ─────────────────────────────────────────────────────────────────
+    const mustWinEl = document.getElementById("must-win");
+    mustWinEl.value = state.mustWin;
+    mustWinEl.addEventListener("input", e => { state.mustWin = e.target.value; save(K.mustWin, state.mustWin); });
+
+    ["secondary-1", "secondary-2"].forEach((id, i) => {
+      const el = document.getElementById(id);
+      el.value = state.secondary[i] || "";
+      el.addEventListener("input", e => { state.secondary[i] = e.target.value; save(K.secondary, state.secondary); });
+    });
+
+    // ── BASELINE ──────────────────────────────────────────────────────────────
+    const baselineList = document.getElementById("baseline-list");
+
+    function isItemChecked(item, isChild) {
+      if (!isChild && Array.isArray(item.children) && item.children.length > 0) {
+        return item.children.every(c => !!state.baseline[c.id]);
+      }
+      return !!state.baseline[item.id];
+    }
+
+    function buildBaselineRow(item, parentItem) {
+      const isChild = !!parentItem;
+      const row = document.createElement("div");
+      row.className = "baseline-row" + (isChild ? " baseline-row-child" : "");
+
+      const lbl = document.createElement("label");
+      lbl.className = "baseline-checkbox-label";
+
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.style.display = "none";
+
+      const box = document.createElement("span");
+      box.className = "checkbox-box";
+
+      const labelInput = document.createElement("input");
+      labelInput.type = "text";
+      labelInput.className = "baseline-label-input";
+      labelInput.value = item.label;
+      labelInput.placeholder = isChild ? "Sub-item name" : "Item name";
+
+      function refreshChecked() {
+        const checked = isItemChecked(item, isChild);
+        cb.checked = checked;
+        labelInput.style.textDecoration = checked ? "line-through" : "";
+        labelInput.style.color = checked ? "var(--muted)" : "";
+        box.style.background = checked ? "var(--success)" : "";
+        box.style.borderColor = checked ? "var(--success)" : "";
+        box.style.color = checked ? "#fff" : "";
+        box.style.fontWeight = checked ? "700" : "";
+        box.style.fontSize = checked ? "11px" : "";
+        box.textContent = checked ? "✓" : "";
+      }
+      refreshChecked();
+
+      cb.addEventListener("change", () => {
+        if (!isChild && Array.isArray(item.children) && item.children.length > 0) {
+          const target = cb.checked;
+          item.children.forEach(c => { state.baseline[c.id] = target; });
+          save(K.baseline, state.baseline);
+          renderBaseline();
+        } else {
+          state.baseline[item.id] = cb.checked;
+          save(K.baseline, state.baseline);
+          if (isChild) renderBaseline();
+          else refreshChecked();
+        }
+      });
+
+      labelInput.addEventListener("click", e => e.stopPropagation());
+      labelInput.addEventListener("input", () => {
+        item.label = labelInput.value;
+        save(K.baselineItems, state.baselineItems);
+      });
+
+      lbl.addEventListener("click", e => {
+        if (e.target === labelInput) return;
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event("change"));
+      });
+
+      lbl.append(cb, box, labelInput);
+
+      const controls = document.createElement("div");
+      controls.className = "baseline-row-controls";
+
+      if (!isChild) {
+        if (Array.isArray(item.children) && item.children.length > 0) {
+          const checkedCount = item.children.filter(c => !!state.baseline[c.id]).length;
+          const countEl = document.createElement("span");
+          countEl.className = "baseline-child-count";
+          countEl.textContent = `${checkedCount}/${item.children.length}`;
+          controls.append(countEl);
+        }
+
+        const expandBtn = document.createElement("button");
+        expandBtn.className = "baseline-expand-btn" + (item._expanded ? " open" : "");
+        expandBtn.textContent = "▸";
+        expandBtn.title = item._expanded ? "Collapse" : "Expand sub-items";
+        expandBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          item._expanded = !item._expanded;
+          save(K.baselineItems, state.baselineItems);
+          renderBaseline();
+        });
+        controls.append(expandBtn);
+      }
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "btn-remove";
+      removeBtn.textContent = "×";
+      removeBtn.title = "Remove";
+      removeBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        if (isChild) {
+          parentItem.children = parentItem.children.filter(c => c.id !== item.id);
+          delete state.baseline[item.id];
+        } else {
+          state.baselineItems = state.baselineItems.filter(x => x.id !== item.id);
+          delete state.baseline[item.id];
+          if (Array.isArray(item.children)) {
+            item.children.forEach(c => delete state.baseline[c.id]);
+          }
+        }
+        save(K.baselineItems, state.baselineItems);
+        save(K.baseline, state.baseline);
+        renderBaseline();
+      });
+      controls.append(removeBtn);
+
+      row.append(lbl, controls);
+      return row;
+    }
+
+    function renderBaseline() {
+      baselineList.innerHTML = "";
+      state.baselineItems.forEach(item => {
+        if (!Array.isArray(item.children)) item.children = [];
+
+        const li = document.createElement("li");
+        li.append(buildBaselineRow(item, null));
+
+        if (item._expanded) {
+          const childrenWrap = document.createElement("div");
+          childrenWrap.className = "baseline-children";
+
+          item.children.forEach(child => {
+            childrenWrap.append(buildBaselineRow(child, item));
+          });
+
+          const addChildBtn = document.createElement("button");
+          addChildBtn.className = "btn-add-child";
+          addChildBtn.textContent = "+ Sub-item";
+          addChildBtn.addEventListener("click", () => {
+            item.children.push({ id: crypto.randomUUID(), label: "" });
+            save(K.baselineItems, state.baselineItems);
+            renderBaseline();
+            const inputs = baselineList.querySelectorAll(".baseline-row-child .baseline-label-input");
+            if (inputs.length) inputs[inputs.length - 1].focus();
+          });
+          childrenWrap.append(addChildBtn);
+
+          li.append(childrenWrap);
+        }
+
+        baselineList.append(li);
+      });
+    }
+
+    document.getElementById("baseline-add").addEventListener("click", () => {
+      state.baselineItems.push({ id: crypto.randomUUID(), label: "" });
+      save(K.baselineItems, state.baselineItems);
+      renderBaseline();
+      const inputs = baselineList.querySelectorAll(".baseline-label-input");
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    // ── RITUALS ───────────────────────────────────────────────────────────────
+    const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
+    const DAY_NAMES   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const todayDow    = new Date().getDay();
+
+    const ritualList = document.getElementById("ritual-list");
+
+    function renderRituals() {
+      ritualList.innerHTML = "";
+      if (state.rituals.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "ritual-empty";
+        empty.textContent = "No rituals yet. Add one below.";
+        ritualList.append(empty);
+        return;
+      }
+
+      state.rituals.forEach(r => {
+        if (!Array.isArray(r.days)) r.days = [];
+        const isToday   = r.days.includes(todayDow);
+        const isChecked = isToday && !!state.ritualsCheck[r.id];
+
+        const row = document.createElement("div");
+        row.className = "ritual-row" + (!isToday ? " inactive" : "") + (isChecked ? " checked" : "");
+
+        const check = document.createElement("button");
+        check.className = "ritual-check" + (isToday ? "" : " disabled") + (isChecked ? " checked" : "");
+        check.textContent = isChecked ? "✓" : "";
+        check.title = isToday ? "Mark done" : "";
+        if (isToday) {
+          check.addEventListener("click", () => {
+            state.ritualsCheck[r.id] = !state.ritualsCheck[r.id];
+            save(K.ritualsCheck, state.ritualsCheck);
+            renderRituals();
+          });
+        }
+
+        const labelInput = document.createElement("input");
+        labelInput.type = "text";
+        labelInput.className = "ritual-label";
+        labelInput.placeholder = "Ritual name";
+        labelInput.value = r.label;
+        labelInput.addEventListener("input", () => {
+          r.label = labelInput.value;
+          save(K.rituals, state.rituals);
+        });
+
+        const chipsWrap = document.createElement("div");
+        chipsWrap.className = "day-chips";
+        DAY_LETTERS.forEach((letter, i) => {
+          const chip = document.createElement("button");
+          const active = r.days.includes(i);
+          chip.className = "day-chip" + (active ? " active" : "") + (i === todayDow ? " today" : "");
+          chip.textContent = letter;
+          chip.title = DAY_NAMES[i];
+          chip.addEventListener("click", () => {
+            const idx = r.days.indexOf(i);
+            if (idx >= 0) r.days.splice(idx, 1);
+            else { r.days.push(i); r.days.sort(); }
+            save(K.rituals, state.rituals);
+            renderRituals();
+          });
+          chipsWrap.append(chip);
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-remove";
+        removeBtn.textContent = "×";
+        removeBtn.title = "Remove ritual";
+        removeBtn.addEventListener("click", () => {
+          state.rituals = state.rituals.filter(x => x.id !== r.id);
+          delete state.ritualsCheck[r.id];
+          save(K.rituals, state.rituals);
+          save(K.ritualsCheck, state.ritualsCheck);
+          renderRituals();
+        });
+
+        row.append(check, labelInput, chipsWrap, removeBtn);
+        ritualList.append(row);
+      });
+    }
+
+    document.getElementById("ritual-add").addEventListener("click", () => {
+      state.rituals.push({ id: crypto.randomUUID(), label: "", days: [todayDow] });
+      save(K.rituals, state.rituals);
+      renderRituals();
+      const inputs = ritualList.querySelectorAll(".ritual-label");
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    // ── PROJECTS ──────────────────────────────────────────────────────────────
+    const projectsList = document.getElementById("projects-list");
+    const projectCountEl = document.getElementById("project-count");
+    const addProjectBtn = document.getElementById("add-project");
+    const limitNote = document.getElementById("limit-note");
+
+    function updateProjectCount() {
+      const n = state.projects.length;
+      projectCountEl.textContent = `${n} / 3`;
+      projectCountEl.classList.toggle("at-limit", n >= 3);
+      addProjectBtn.disabled = n >= 3;
+      limitNote.classList.toggle("visible", n >= 3);
+    }
+
+    function renderProjects() {
+      projectsList.innerHTML = "";
+      state.projects.forEach(p => {
+        const item = document.createElement("div");
+        item.className = "project-item";
+
+        const header = document.createElement("div");
+        header.className = "project-item-header";
+
+        const nameInput = document.createElement("input");
+        nameInput.className = "input project-name-input";
+        nameInput.type = "text";
+        nameInput.placeholder = "Project name";
+        nameInput.value = p.name;
+        nameInput.addEventListener("input", e => {
+          p.name = e.target.value;
+          save(K.projects, state.projects);
+          renderWeekWins();
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-remove";
+        removeBtn.textContent = "×";
+        removeBtn.title = "Remove project";
+        removeBtn.addEventListener("click", () => {
+          state.projects = state.projects.filter(x => x.id !== p.id);
+          delete state.weekWins[p.id];
+          save(K.projects, state.projects);
+          save(K.weekWins, state.weekWins);
+          renderProjects();
+          renderWeekWins();
+          updateProjectCount();
+        });
+
+        header.append(nameInput, removeBtn);
+
+        const actionInput = document.createElement("input");
+        actionInput.className = "input project-action-input";
+        actionInput.type = "text";
+        actionInput.placeholder = "Next visible action…";
+        actionInput.value = p.action;
+        actionInput.addEventListener("input", e => {
+          p.action = e.target.value;
+          save(K.projects, state.projects);
+        });
+
+        item.append(header, actionInput);
+        projectsList.append(item);
+      });
+      updateProjectCount();
+    }
+
+    addProjectBtn.addEventListener("click", () => {
+      if (state.projects.length >= 3) return;
+      state.projects.push({ id: crypto.randomUUID(), name: "", action: "" });
+      save(K.projects, state.projects);
+      renderProjects();
+      renderWeekWins();
+      // Focus the new name input
+      const inputs = projectsList.querySelectorAll(".project-name-input");
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    // ── WAITING FOR ───────────────────────────────────────────────────────────
+    const waitingList = document.getElementById("waiting-list");
+    const waitingInput = document.getElementById("waiting-input");
+
+    function renderWaiting() {
+      waitingList.innerHTML = "";
+      if (state.waiting.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "waiting-empty";
+        empty.textContent = "Nothing pending.";
+        waitingList.append(empty);
+        return;
+      }
+      state.waiting.forEach(item => {
+        const li = document.createElement("li");
+        li.className = "waiting-item";
+        const span = document.createElement("span");
+        span.textContent = item.text;
+        const btn = document.createElement("button");
+        btn.className = "btn-remove";
+        btn.textContent = "×";
+        btn.addEventListener("click", () => {
+          state.waiting = state.waiting.filter(x => x.id !== item.id);
+          save(K.waiting, state.waiting);
+          renderWaiting();
+        });
+        li.append(span, btn);
+        waitingList.append(li);
+      });
+    }
+
+    waitingInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && waitingInput.value.trim()) {
+        state.waiting.push({ id: crypto.randomUUID(), text: waitingInput.value.trim() });
+        save(K.waiting, state.waiting);
+        waitingInput.value = "";
+        renderWaiting();
+      }
+    });
+
+    // ── THIS WEEK ─────────────────────────────────────────────────────────────
+    const weekWinsEl = document.getElementById("week-wins");
+
+    function renderWeekWins() {
+      weekWinsEl.innerHTML = "";
+      if (state.projects.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "week-empty";
+        empty.textContent = "Add projects to track weekly wins.";
+        weekWinsEl.append(empty);
+        return;
+      }
+      state.projects.forEach(p => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "week-win-item";
+        const label = document.createElement("label");
+        label.className = "field-label";
+        label.textContent = p.name || "Unnamed Project";
+        const input = document.createElement("input");
+        input.className = "input";
+        input.type = "text";
+        input.placeholder = "Concrete win this week…";
+        input.value = state.weekWins[p.id] || "";
+        input.addEventListener("input", () => {
+          state.weekWins[p.id] = input.value;
+          save(K.weekWins, state.weekWins);
+        });
+        wrapper.append(label, input);
+        weekWinsEl.append(wrapper);
+      });
+    }
+
+    // ── END-OF-DAY SCORE ──────────────────────────────────────────────────────
+    const EOD_AREAS = [
+      { key: "body",    label: "Body" },
+      { key: "work",    label: "Work" },
+      { key: "project", label: "Project" },
+      { key: "mind",    label: "Mind" },
+      { key: "people",  label: "People" },
+    ];
+
+    function eodIcon(v) { return v === true ? "✅" : v === false ? "❌" : "➖"; }
+    function eodNext(v) { return v === null ? true : v === true ? false : null; }
+    function eodApplyClass(btn, v) {
+      btn.classList.toggle("done", v === true);
+      btn.classList.toggle("bad",  v === false);
+    }
+
+    const eodGrid = document.getElementById("eod-grid");
+    EOD_AREAS.forEach(({ key, label }) => {
+      const btn = document.createElement("button");
+      btn.className = "eod-btn";
+      eodApplyClass(btn, state.eod[key]);
+      const icon = document.createElement("span");
+      icon.className = "eod-icon";
+      icon.textContent = eodIcon(state.eod[key]);
+      btn.textContent = label;
+      btn.append(icon);
+      btn.addEventListener("click", () => {
+        state.eod[key] = eodNext(state.eod[key]);
+        eodApplyClass(btn, state.eod[key]);
+        icon.textContent = eodIcon(state.eod[key]);
+        save(K.eod, state.eod);
+      });
+      eodGrid.append(btn);
+    });
+
+    // ── HISTORY ───────────────────────────────────────────────────────────────
+    const historyOverlay = document.getElementById("history-overlay");
+    const historyScroll  = document.getElementById("history-list");
+    const editingDates   = new Set();
+
+    function openHistory() {
+      renderHistory();
+      historyOverlay.classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeHistory() {
+      historyOverlay.classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    document.getElementById("history-btn").addEventListener("click", openHistory);
+    document.getElementById("history-close").addEventListener("click", closeHistory);
+    historyOverlay.addEventListener("click", e => { if (e.target === historyOverlay) closeHistory(); });
+
+    function getAllHistoryDates() {
+      const dates = new Set();
+      const pat = /^tt_mustwin_(\d{4}-\d{2}-\d{2})$/;
+      Object.keys(localStorage).forEach(k => {
+        const m = k.match(pat);
+        if (m && m[1] !== TODAY) dates.add(m[1]);
+      });
+      return Array.from(dates).sort().reverse();
+    }
+
+    function fmtHistoryDate(iso) {
+      const [y, mo, d] = iso.split("-").map(Number);
+      const dt = new Date(y, mo - 1, d);
+      return `${DAYS[dt.getDay()]}, ${MONTHS[dt.getMonth()]} ${d}`;
+    }
+
+    function buildDayDetail(iso, container, editable) {
+      container.innerHTML = "";
+      const mustWin       = load(`tt_mustwin_${iso}`, "");
+      const secondary     = load(`tt_secondary_${iso}`, ["", ""]);
+      const baseline      = load(`tt_baseline_${iso}`, {});
+      const eod           = load(`tt_eod_${iso}`, {});
+      const mode          = load(`tt_mode_${iso}`, null);
+      const ritualsCheck  = load(`tt_rituals_${iso}`, {});
+      const closed        = load(`tt_closed_${iso}`, null);
+      const baselineItems = load(K.baselineItems, []);
+      const rituals       = load(K.rituals, []);
+      const [yy, mm, dd]  = iso.split("-").map(Number);
+      const dow           = new Date(yy, mm - 1, dd).getDay();
+
+      if (editable) {
+        // Must-win
+        const mwLbl = document.createElement("div");
+        mwLbl.className = "day-section-label";
+        mwLbl.textContent = "Must-Win";
+        container.append(mwLbl);
+        const mwInput = document.createElement("input");
+        mwInput.className = "input must-win-input";
+        mwInput.style.marginBottom = "10px";
+        mwInput.type = "text";
+        mwInput.placeholder = "Must-win";
+        mwInput.value = mustWin;
+        mwInput.addEventListener("input", () => save(`tt_mustwin_${iso}`, mwInput.value));
+        container.append(mwInput);
+
+        // Secondary
+        const secLbl = document.createElement("div");
+        secLbl.className = "day-section-label";
+        secLbl.textContent = "Secondary";
+        container.append(secLbl);
+        [0, 1].forEach(i => {
+          const secInput = document.createElement("input");
+          secInput.className = "input";
+          secInput.type = "text";
+          secInput.placeholder = "Secondary task";
+          secInput.value = secondary[i] || "";
+          secInput.style.marginBottom = "6px";
+          secInput.addEventListener("input", () => {
+            secondary[i] = secInput.value;
+            save(`tt_secondary_${iso}`, secondary);
+          });
+          container.append(secInput);
+        });
+
+        // Mode
+        const modeLbl = document.createElement("div");
+        modeLbl.className = "day-section-label";
+        modeLbl.style.marginTop = "8px";
+        modeLbl.textContent = "Mode";
+        container.append(modeLbl);
+        const modeRow = document.createElement("div");
+        modeRow.style.cssText = "display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;";
+        let currentMode = mode;
+        ["build","operate","recover"].forEach(m => {
+          const pill = document.createElement("button");
+          pill.className = "mode-pill" + (currentMode === m ? " active" : "");
+          pill.dataset.mode = m;
+          pill.textContent = m;
+          pill.style.fontSize = "0.75rem";
+          pill.addEventListener("click", () => {
+            currentMode = currentMode === m ? null : m;
+            save(`tt_mode_${iso}`, currentMode);
+            modeRow.querySelectorAll(".mode-pill").forEach(p =>
+              p.classList.toggle("active", p.dataset.mode === currentMode)
+            );
+          });
+          modeRow.append(pill);
+        });
+        container.append(modeRow);
+
+        // Baseline
+        if (baselineItems.length) {
+          const blLbl = document.createElement("div");
+          blLbl.className = "day-section-label";
+          blLbl.textContent = "Baseline";
+          container.append(blLbl);
+          baselineItems.forEach(item => {
+            const hasKids = Array.isArray(item.children) && item.children.length > 0;
+            if (hasKids) {
+              const parentLbl = document.createElement("div");
+              parentLbl.style.cssText = "font-size:0.82rem;color:var(--muted);font-weight:600;padding:6px 0 2px;";
+              parentLbl.textContent = item.label;
+              container.append(parentLbl);
+              item.children.forEach(child => {
+                const row = makeCheckRow(child.label, !!baseline[child.id], checked => {
+                  baseline[child.id] = checked;
+                  save(`tt_baseline_${iso}`, baseline);
+                });
+                row.style.paddingLeft = "14px";
+                container.append(row);
+              });
+            } else {
+              container.append(makeCheckRow(item.label, !!baseline[item.id], checked => {
+                baseline[item.id] = checked;
+                save(`tt_baseline_${iso}`, baseline);
+              }));
+            }
+          });
+        }
+
+        // Rituals
+        const dayRituals = rituals.filter(r => Array.isArray(r.days) && r.days.includes(dow));
+        if (dayRituals.length) {
+          const rLbl = document.createElement("div");
+          rLbl.className = "day-section-label";
+          rLbl.style.marginTop = "8px";
+          rLbl.textContent = "Rituals";
+          container.append(rLbl);
+          dayRituals.forEach(r => {
+            container.append(makeCheckRow(r.label || "(unnamed)", !!ritualsCheck[r.id], checked => {
+              ritualsCheck[r.id] = checked;
+              save(`tt_rituals_${iso}`, ritualsCheck);
+            }));
+          });
+        }
+
+        // EOD
+        const eodLbl = document.createElement("div");
+        eodLbl.className = "day-section-label";
+        eodLbl.style.marginTop = "8px";
+        eodLbl.textContent = "End-of-Day";
+        container.append(eodLbl);
+        const eodGrid = document.createElement("div");
+        eodGrid.className = "eod-grid";
+        eodGrid.style.marginBottom = "10px";
+        EOD_AREAS.forEach(({ key, label }) => {
+          let val = eod[key] ?? null;
+          const btn = document.createElement("button");
+          btn.className = "eod-btn";
+          eodApplyClass(btn, val);
+          const icon = document.createElement("span");
+          icon.className = "eod-icon";
+          icon.textContent = eodIcon(val);
+          btn.textContent = label;
+          btn.append(icon);
+          btn.addEventListener("click", () => {
+            val = eodNext(val);
+            eod[key] = val;
+            save(`tt_eod_${iso}`, eod);
+            eodApplyClass(btn, val);
+            icon.textContent = eodIcon(val);
+          });
+          eodGrid.append(btn);
+        });
+        container.append(eodGrid);
+
+      } else {
+        // Read-only
+        const mwEl = document.createElement("div");
+        mwEl.className = "day-must-win";
+        if (mustWin) { mwEl.textContent = mustWin; }
+        else { mwEl.innerHTML = `<span class="day-dim">No must-win set</span>`; }
+        container.append(mwEl);
+
+        const secArr = secondary.filter(Boolean);
+        if (secArr.length) {
+          const sec = document.createElement("div");
+          sec.className = "day-secondary";
+          sec.textContent = secArr.join(" · ");
+          container.append(sec);
+        }
+
+        if (mode) {
+          const badge = document.createElement("span");
+          badge.className = `day-mode-badge${mode === "recover" ? " recover" : ""}`;
+          badge.textContent = mode;
+          container.append(badge);
+        }
+
+        if (baselineItems.length) {
+          const itemDone = it => {
+            if (Array.isArray(it.children) && it.children.length > 0)
+              return it.children.every(c => !!baseline[c.id]);
+            return !!baseline[it.id];
+          };
+          const checkedCount = baselineItems.filter(itemDone).length;
+          const blLabel = document.createElement("div");
+          blLabel.className = "day-section-label";
+          blLabel.textContent = `Baseline ${checkedCount}/${baselineItems.length}`;
+          container.append(blLabel);
+          const blList = document.createElement("div");
+          blList.className = "day-bl-list";
+          baselineItems.forEach(item => {
+            const hasKids = Array.isArray(item.children) && item.children.length > 0;
+            const done = itemDone(item);
+            const labelText = hasKids
+              ? `${item.label} (${item.children.filter(c => !!baseline[c.id]).length}/${item.children.length})`
+              : item.label;
+            const row = document.createElement("div");
+            row.className = `day-bl-item${done ? " done" : ""}`;
+            row.textContent = `${done ? "✓" : "○"} ${labelText}`;
+            blList.append(row);
+          });
+          container.append(blList);
+        }
+
+        const dayRituals = rituals.filter(r => Array.isArray(r.days) && r.days.includes(dow));
+        if (dayRituals.length) {
+          const checkedR = dayRituals.filter(r => !!ritualsCheck[r.id]).length;
+          const rLabel = document.createElement("div");
+          rLabel.className = "day-section-label";
+          rLabel.textContent = `Rituals ${checkedR}/${dayRituals.length}`;
+          container.append(rLabel);
+          const rList = document.createElement("div");
+          rList.className = "day-bl-list";
+          dayRituals.forEach(r => {
+            const done = !!ritualsCheck[r.id];
+            const row = document.createElement("div");
+            row.className = `day-bl-item${done ? " done" : ""}`;
+            row.textContent = `${done ? "✓" : "○"} ${r.label || "(unnamed)"}`;
+            rList.append(row);
+          });
+          container.append(rList);
+        }
+
+        const eodLabel = document.createElement("div");
+        eodLabel.className = "day-section-label";
+        eodLabel.textContent = "End-of-Day";
+        container.append(eodLabel);
+
+        const eodRow = document.createElement("div");
+        eodRow.className = "day-eod-row";
+        EOD_AREAS.forEach(({ key, label }) => {
+          const chip = document.createElement("div");
+          chip.className = "day-eod-chip";
+          chip.innerHTML = `<span>${label}</span><span>${eodIcon(eod[key] ?? null)}</span>`;
+          eodRow.append(chip);
+        });
+        container.append(eodRow);
+
+        if (closed) {
+          const closedLine = document.createElement("div");
+          closedLine.className = "day-closed-line";
+          closedLine.textContent = closed.auto
+            ? "Auto-closed at end of day."
+            : `Submitted at ${fmtTime(closed.at)}.`;
+          container.append(closedLine);
+        }
+      }
+    }
+
+    function makeCheckRow(label, checked, onChange) {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;";
+      let state = checked;
+
+      const box = document.createElement("span");
+      box.className = "checkbox-box";
+      box.style.flexShrink = "0";
+
+      const text = document.createElement("span");
+      text.style.fontSize = "0.9rem";
+
+      function refresh() {
+        if (state) {
+          box.style.cssText = "flex-shrink:0;width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--success);border:1.5px solid var(--success);color:#fff;font-weight:700;font-size:11px;";
+          box.textContent = "✓";
+          text.style.cssText = "font-size:0.9rem;color:var(--muted);text-decoration:line-through;";
+        } else {
+          box.style.cssText = "flex-shrink:0;width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1.5px solid var(--border);";
+          box.textContent = "";
+          text.style.cssText = "font-size:0.9rem;";
+        }
+      }
+      text.textContent = label;
+      refresh();
+
+      row.addEventListener("click", () => {
+        state = !state;
+        onChange(state);
+        refresh();
+      });
+
+      row.append(box, text);
+      return row;
+    }
+
+    function renderHistory() {
+      historyScroll.innerHTML = "";
+      const dates = getAllHistoryDates();
+      if (dates.length === 0) {
+        historyScroll.innerHTML = `<p class="history-empty">No past days recorded yet.<br>Data will appear here as you use the app each day.</p>`;
+        return;
+      }
+
+      dates.forEach(iso => {
+        const eod    = load(`tt_eod_${iso}`, {});
+        const closed = load(`tt_closed_${iso}`, null);
+        const eodMini = ["body","work","project","mind","people"].map(k => eodIcon(eod[k] ?? null)).join("");
+
+        const card = document.createElement("div");
+        card.className = "day-card";
+
+        const hdr = document.createElement("div");
+        hdr.className = "day-card-hdr";
+
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "day-date";
+        dateSpan.textContent = fmtHistoryDate(iso);
+
+        const meta = document.createElement("div");
+        meta.className = "day-meta";
+        const statusBadge = closed
+          ? `<span class="day-status ${closed.auto ? "auto" : "submitted"}">${closed.auto ? "auto" : "✓"}</span>`
+          : "";
+        meta.innerHTML = `${statusBadge}<span class="day-eod-mini">${eodMini}</span>`;
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "history-edit-btn";
+        editBtn.textContent = editingDates.has(iso) ? "Done" : "Edit";
+        editBtn.title = "Edit this day";
+
+        const chevron = document.createElement("span");
+        chevron.className = "day-chevron";
+        chevron.textContent = "▾";
+
+        meta.append(editBtn, chevron);
+        hdr.append(dateSpan, meta);
+
+        const detail = document.createElement("div");
+        detail.className = "day-detail";
+        buildDayDetail(iso, detail, editingDates.has(iso));
+
+        editBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          if (editingDates.has(iso)) {
+            editingDates.delete(iso);
+            editBtn.textContent = "Edit";
+          } else {
+            editingDates.add(iso);
+            editBtn.textContent = "Done";
+            card.classList.add("open");
+          }
+          buildDayDetail(iso, detail, editingDates.has(iso));
+        });
+
+        hdr.addEventListener("click", () => card.classList.toggle("open"));
+        card.append(hdr, detail);
+        historyScroll.append(card);
+      });
+    }
+
+    // ── DAY CLOSE ─────────────────────────────────────────────────────────────
+    const closeCardEl = document.getElementById("close-card");
+
+    function fmtTime(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      let h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2, "0");
+      const am = h < 12;
+      h = h % 12; if (h === 0) h = 12;
+      return `${h}:${m} ${am ? "AM" : "PM"}`;
+    }
+
+    function renderCloseCard() {
+      closeCardEl.innerHTML = "";
+      if (state.closed) {
+        document.body.classList.add("day-closed");
+
+        const wrap = document.createElement("div");
+        wrap.className = "closed-summary";
+
+        const text = document.createElement("div");
+        text.className = "closed-summary-text";
+
+        const title = document.createElement("div");
+        title.className = "closed-summary-title";
+        title.innerHTML = `<span>✓</span><span>Day Closed</span>`;
+
+        const time = document.createElement("div");
+        time.className = "closed-summary-time";
+        time.textContent = state.closed.at
+          ? `Submitted at ${fmtTime(state.closed.at)}`
+          : "Auto-closed";
+
+        text.append(title, time);
+
+        const reopenBtn = document.createElement("button");
+        reopenBtn.className = "btn-reopen";
+        reopenBtn.textContent = "Reopen";
+        reopenBtn.addEventListener("click", () => {
+          state.closed = null;
+          localStorage.removeItem(K.closed);
+          renderCloseCard();
+        });
+
+        wrap.append(text, reopenBtn);
+        closeCardEl.append(wrap);
+      } else {
+        document.body.classList.remove("day-closed");
+        const btn = document.createElement("button");
+        btn.className = "btn-submit-day";
+        btn.textContent = "Close Day";
+        btn.addEventListener("click", () => {
+          state.closed = { at: new Date().toISOString(), auto: false };
+          save(K.closed, state.closed);
+          renderCloseCard();
+        });
+        closeCardEl.append(btn);
+      }
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────────────────
+    renderBaseline();
+    renderRituals();
+    renderProjects();
+    renderWaiting();
+    renderWeekWins();
+    renderCloseCard();
+  </script>
+</body>
+</html>
