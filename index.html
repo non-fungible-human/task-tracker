@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Task Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -868,15 +869,95 @@
       font-size: 0.68rem;
       color: var(--muted);
     }
+
+    /* ── AUTH OVERLAY ── */
+    #auth-overlay {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    #auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      width: 100%; max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+    }
+    #auth-card h2 { font-size: 1.25rem; font-weight: 700; }
+    #auth-card > p { color: var(--muted); font-size: 0.9rem; }
+    #auth-loading { color: var(--muted); font-size: 0.9rem; padding: 8px 0; }
+    #auth-form { display: none; flex-direction: column; gap: 14px; }
+    #auth-email {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      outline: none;
+      text-align: left;
+    }
+    #auth-email:focus { border-color: var(--accent); }
+    #auth-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #auth-btn:hover { opacity: 0.85; }
+    #auth-btn:disabled { opacity: 0.5; cursor: default; }
+    #auth-msg { font-size: 0.85rem; display: none; }
+
+    /* ── SYNC DOT ── */
+    .sync-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+      flex-shrink: 0;
+      transition: background 0.4s;
+    }
+    .sync-dot.sync-synced  { background: var(--success); }
+    .sync-dot.sync-loading { background: var(--warning); }
+    .sync-dot.sync-error   { background: var(--danger); }
   </style>
 </head>
 <body>
+
+  <!-- AUTH OVERLAY -->
+  <div id="auth-overlay">
+    <div id="auth-card">
+      <div id="auth-loading">Loading…</div>
+      <div id="auth-form">
+        <h2>Task Tracker</h2>
+        <p>Sign in to sync your data across devices.</p>
+        <input type="email" id="auth-email" placeholder="your@email.com" autocomplete="email">
+        <button id="auth-btn">Send magic link</button>
+        <p id="auth-msg"></p>
+      </div>
+    </div>
+  </div>
 
   <header class="app-header">
     <div class="header-inner">
       <div class="header-left">
         <span class="date-display" id="date-display"></span>
         <button class="history-btn" id="history-btn">History</button>
+        <span id="sync-dot" class="sync-dot" title="Syncing…"></span>
       </div>
       <div class="mode-selector" id="mode-selector">
         <button class="mode-pill" data-mode="build">Build</button>
@@ -965,6 +1046,18 @@
   </div>
 
   <script>
+    // ── SUPABASE ──────────────────────────────────────────────────────────────
+    const SUPABASE_URL      = 'https://izxdheoqmmiqyulpkrgh.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6eGRoZW9xbW1pcXl1bHBrcmdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzI4ODYsImV4cCI6MjA5Mjk0ODg4Nn0.UhdaO9gtFHC1nZjk9aKoqmIK3PuEueecVn2un-MY6i0';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentUser = null;
+    let appInitialized = false;
+
+    function setSyncStatus(status) {
+      const dot = document.getElementById('sync-dot');
+      if (dot) dot.className = 'sync-dot sync-' + status;
+    }
+
     // ── DATE ──────────────────────────────────────────────────────────────────
     const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -997,7 +1090,40 @@
 
     function save(key, val) {
       try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+      if (currentUser) {
+        sb.from('app_data').upsert({ key, value: val }).catch(() => setSyncStatus('error'));
+      }
     }
+
+    function removeItem(key) {
+      localStorage.removeItem(key);
+      if (currentUser) {
+        sb.from('app_data').delete().eq('key', key).catch(() => {});
+      }
+    }
+
+    // ── APP INIT (async — waits for Supabase data) ────────────────────────────
+    async function initApp() {
+      if (appInitialized) return;
+      appInitialized = true;
+      setSyncStatus('loading');
+
+      try {
+        const { data } = await sb.from('app_data').select('key,value');
+        if (data && data.length > 0) {
+          // Seed localStorage from Supabase
+          data.forEach(({ key, value }) => {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+          });
+        } else {
+          // First login: migrate existing localStorage to Supabase
+          const rows = Object.keys(localStorage)
+            .filter(k => k.startsWith('tt_'))
+            .map(k => { try { return { key: k, value: JSON.parse(localStorage.getItem(k)) }; } catch { return null; } })
+            .filter(Boolean);
+          if (rows.length > 0) await sb.from('app_data').upsert(rows);
+        }
+      } catch {}
 
     // ── STATE ─────────────────────────────────────────────────────────────────
     const state = {
@@ -1030,7 +1156,7 @@
         if (m && m[1] !== TODAY) {
           const ck = `tt_closed_${m[1]}`;
           if (localStorage.getItem(ck) === null) {
-            localStorage.setItem(ck, JSON.stringify({ at: null, auto: true }));
+            save(ck, { at: null, auto: true });
           }
         }
       });
@@ -1042,7 +1168,7 @@
       const pat = /^tt_(mode|mustwin|secondary|baseline|eod|rituals|closed)_(\d{4}-\d{2}-\d{2})$/;
       Object.keys(localStorage).forEach(k => {
         const m = k.match(pat);
-        if (m && new Date(m[2]) < cutoff) localStorage.removeItem(k);
+        if (m && new Date(m[2]) < cutoff) removeItem(k);
       });
     })();
 
@@ -1935,7 +2061,7 @@
         reopenBtn.textContent = "Reopen";
         reopenBtn.addEventListener("click", () => {
           state.closed = null;
-          localStorage.removeItem(K.closed);
+          removeItem(K.closed);
           renderCloseCard();
         });
 
@@ -1962,6 +2088,37 @@
     renderWaiting();
     renderWeekWins();
     renderCloseCard();
+    setSyncStatus('synced');
+    } // end initApp
+
+    // ── AUTH FLOW ─────────────────────────────────────────────────────────────
+    sb.auth.onAuthStateChange((event, session) => {
+      currentUser = session?.user ?? null;
+      const overlay = document.getElementById('auth-overlay');
+      if (currentUser) {
+        overlay.style.display = 'none';
+        initApp();
+      } else {
+        document.getElementById('auth-loading').style.display = 'none';
+        document.getElementById('auth-form').style.display = 'flex';
+      }
+    });
+
+    document.getElementById('auth-btn').addEventListener('click', async () => {
+      const email = document.getElementById('auth-email').value.trim();
+      if (!email) return;
+      const btn = document.getElementById('auth-btn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      const { error } = await sb.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: location.href }
+      });
+      btn.disabled = false; btn.textContent = 'Send magic link';
+      const msg = document.getElementById('auth-msg');
+      msg.style.display = 'block';
+      msg.textContent = error ? error.message : '✓ Check your email — click the link to sign in.';
+      msg.style.color = error ? 'var(--danger)' : 'var(--success)';
+    });
   </script>
 </body>
 </html>
