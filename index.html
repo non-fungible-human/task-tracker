@@ -1111,18 +1111,22 @@
 
       try {
         const { data } = await sb.from('app_data').select('key,value');
+        const supabaseKeys = new Set((data || []).map(r => r.key));
+
+        // Seed localStorage from Supabase
         if (data && data.length > 0) {
-          // Seed localStorage from Supabase
           data.forEach(({ key, value }) => {
             try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
           });
-        } else {
-          // First login: migrate existing localStorage to Supabase
-          const rows = Object.keys(localStorage)
-            .filter(k => k.startsWith('tt_'))
-            .map(k => { try { return { key: k, value: JSON.parse(localStorage.getItem(k)) }; } catch { return null; } })
-            .filter(Boolean);
-          if (rows.length > 0) await sb.from('app_data').upsert(rows);
+        }
+
+        // Upload any local tt_* keys that Supabase is missing (history migration)
+        const missingRows = Object.keys(localStorage)
+          .filter(k => k.startsWith('tt_') && !supabaseKeys.has(k))
+          .map(k => { try { return { key: k, value: JSON.parse(localStorage.getItem(k)) }; } catch { return null; } })
+          .filter(Boolean);
+        if (missingRows.length > 0) {
+          await Promise.resolve(sb.from('app_data').upsert(missingRows)).catch(() => {});
         }
       } catch {}
 
