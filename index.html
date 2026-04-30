@@ -922,6 +922,29 @@
     #auth-btn:hover { opacity: 0.85; }
     #auth-btn:disabled { opacity: 0.5; cursor: default; }
     #auth-msg { font-size: 0.85rem; display: none; }
+    #auth-password {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      outline: none;
+      text-align: left;
+    }
+    #auth-password:focus { border-color: var(--accent); }
+    #auth-signup-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+    #auth-signup-btn:hover { color: var(--text); }
 
     /* ── SYNC DOT ── */
     .sync-dot {
@@ -944,10 +967,11 @@
       <div id="auth-loading">Loading…</div>
       <div id="auth-form">
         <h2>Task Tracker</h2>
-        <p>Sign in to sync your data across devices.</p>
-        <input type="email" id="auth-email" placeholder="your@email.com" autocomplete="email">
-        <button id="auth-btn">Send magic link</button>
+        <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+        <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+        <button id="auth-btn">Sign In</button>
         <p id="auth-msg"></p>
+        <button id="auth-signup-btn">No account yet? Create one</button>
       </div>
     </div>
   </div>
@@ -2111,18 +2135,40 @@
 
     document.getElementById('auth-btn').addEventListener('click', async () => {
       const email = document.getElementById('auth-email').value.trim();
-      if (!email) return;
+      const password = document.getElementById('auth-password').value;
+      if (!email || !password) return;
       const btn = document.getElementById('auth-btn');
-      btn.disabled = true; btn.textContent = 'Sending…';
-      const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: location.href }
-      });
-      btn.disabled = false; btn.textContent = 'Send magic link';
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      btn.disabled = false; btn.textContent = 'Sign In';
+      if (error) {
+        const msg = document.getElementById('auth-msg');
+        msg.style.display = 'block';
+        msg.textContent = error.message;
+        msg.style.color = 'var(--danger)';
+      }
+    });
+
+    document.getElementById('auth-signup-btn').addEventListener('click', async () => {
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      if (!email || !password) {
+        const msg = document.getElementById('auth-msg');
+        msg.style.display = 'block';
+        msg.textContent = 'Enter your email and a password first.';
+        msg.style.color = 'var(--muted)';
+        return;
+      }
+      const { error } = await sb.auth.signUp({ email, password });
       const msg = document.getElementById('auth-msg');
       msg.style.display = 'block';
-      msg.textContent = error ? error.message : '✓ Check your email — click the link to sign in.';
-      msg.style.color = error ? 'var(--danger)' : 'var(--success)';
+      if (error) {
+        msg.textContent = error.message;
+        msg.style.color = 'var(--danger)';
+      } else {
+        msg.textContent = '✓ Account created! Check your email to confirm it, then sign in.';
+        msg.style.color = 'var(--success)';
+      }
     });
   </script>
 </body>
