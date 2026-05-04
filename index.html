@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Task Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -1468,6 +1471,12 @@
   </div>
 
   <script>
+    // Force a fresh script run when this page is restored from back/forward cache.
+    // This avoids stale UI snapshots after deploys or auth redirects on GitHub Pages.
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) window.location.reload();
+    });
+
     // ── SUPABASE AUTH ─────────────────────────────────────────────────────────
     const SUPABASE_URL      = 'https://izxdheoqmmiqyulpkrgh.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6eGRoZW9xbW1pcXl1bHBrcmdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzI4ODYsImV4cCI6MjA5Mjk0ODg4Nn0.UhdaO9gtFHC1nZjk9aKoqmIK3PuEueecVn2un-MY6i0';
