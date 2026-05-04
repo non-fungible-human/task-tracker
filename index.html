@@ -1870,7 +1870,12 @@
 
       const cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.style.display = "none";
+      // Keep checkbox in the accessibility tree; avoid display:none label-toggle quirks.
+      cb.style.position = "absolute";
+      cb.style.opacity = "0";
+      cb.style.width = "1px";
+      cb.style.height = "1px";
+      cb.style.pointerEvents = "none";
 
       const box = document.createElement("span");
       box.className = "checkbox-box";
@@ -1900,13 +1905,12 @@
           const target = cb.checked;
           item.children.forEach(c => { state.baseline[c.id] = target; });
           save(K.baseline, state.baseline);
-          renderBaseline();
         } else {
           state.baseline[item.id] = cb.checked;
           save(K.baseline, state.baseline);
-          if (isChild) renderBaseline();
-          else refreshChecked();
         }
+        // Always re-render so checkbox visuals stay in sync across browsers.
+        renderBaseline();
       });
 
       labelInput.addEventListener("click", e => e.stopPropagation());
