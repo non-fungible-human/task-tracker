@@ -1144,6 +1144,26 @@
     .btn-submit-day { font-size: 1rem !important; }
     .history-btn { font-size: 0.8rem !important; }
 
+    /* ── NOTES ── */
+    .notes-textarea {
+      width: 100%;
+      min-height: 160px;
+      background: rgba(7, 13, 24, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.97rem;
+      line-height: 1.65;
+      padding: 12px 14px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+      display: block;
+    }
+    .notes-textarea::placeholder { color: var(--dim); }
+    .notes-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(20,184,166,0.12); }
+
     /* ── TASK IMPROVEMENTS ── */
     .task-row.dragging {
       opacity: 0.5;
@@ -1423,6 +1443,12 @@
       <button class="btn-add-task" id="add-task">+ Add Task</button>
     </div>
 
+    <!-- NOTES -->
+    <div class="card">
+      <div class="section-label">Notes</div>
+      <textarea class="notes-textarea" id="notes-textarea" placeholder="Type anything here…" spellcheck="false"></textarea>
+    </div>
+
     </div>
   </div>
 
@@ -1590,6 +1616,7 @@
       waiting:       "tt_waiting",
       baselineItems: "tt_baseline_items",
       tasks:         `tt_tasks_${TODAY}`,
+      notes:         "tt_notes",
     };
 
     function load(key, fallback) {
@@ -1625,20 +1652,6 @@
       if (appInitialized) return;
       appInitialized = true;
 
-      // Sync from Supabase in background — non-blocking.
-      // Updates localStorage so the NEXT page load gets fresh data.
-      // Does not delay UI init or event listener setup.
-      if (currentUser) {
-        sb.from('app_data').select('key,value')
-          .then(({ data }) => {
-            if (!data) return;
-            data.forEach(({ key, value }) => {
-              try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-            });
-          })
-          .catch(() => {});
-      }
-
     // ── STATE ─────────────────────────────────────────────────────────────────
     const state = {
       mode:      load(K.mode, null),
@@ -1658,6 +1671,7 @@
       waiting:   load(K.waiting, []),
       tasks:     load(K.tasks, []),
       closed:    load(K.closed, null),
+      notes:     load(K.notes, ""),
     };
 
     // ── SNAPSHOT TODAY'S BASELINE DEFINITION ──────────────────────────────────
@@ -2686,6 +2700,14 @@
         closeCardEl.append(btn);
       }
     }
+
+    // ── NOTES ─────────────────────────────────────────────────────────────────
+    const notesEl = document.getElementById('notes-textarea');
+    notesEl.value = state.notes;
+    notesEl.addEventListener('input', () => {
+      state.notes = notesEl.value;
+      save(K.notes, state.notes);
+    });
 
     // ── INIT ──────────────────────────────────────────────────────────────────
     renderBaseline();
