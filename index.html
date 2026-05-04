@@ -1865,17 +1865,8 @@
       const row = document.createElement("div");
       row.className = "baseline-row" + (isChild ? " baseline-row-child" : "");
 
-      const lbl = document.createElement("label");
+      const lbl = document.createElement("div");
       lbl.className = "baseline-checkbox-label";
-
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      // Keep checkbox in the accessibility tree; avoid display:none label-toggle quirks.
-      cb.style.position = "absolute";
-      cb.style.opacity = "0";
-      cb.style.width = "1px";
-      cb.style.height = "1px";
-      cb.style.pointerEvents = "none";
 
       const box = document.createElement("span");
       box.className = "checkbox-box";
@@ -1888,7 +1879,6 @@
 
       function refreshChecked() {
         const checked = isItemChecked(item, isChild);
-        cb.checked = checked;
         labelInput.style.textDecoration = checked ? "line-through" : "";
         labelInput.style.color = checked ? "var(--muted)" : "";
         box.style.background = checked ? "var(--success)" : "";
@@ -1900,17 +1890,32 @@
       }
       refreshChecked();
 
-      cb.addEventListener("change", () => {
+      function toggleBaselineItem() {
+        const checkedNow = isItemChecked(item, isChild);
         if (!isChild && Array.isArray(item.children) && item.children.length > 0) {
-          const target = cb.checked;
+          const target = !checkedNow;
           item.children.forEach(c => { state.baseline[c.id] = target; });
           save(K.baseline, state.baseline);
         } else {
-          state.baseline[item.id] = cb.checked;
+          state.baseline[item.id] = !checkedNow;
           save(K.baseline, state.baseline);
         }
         // Always re-render so checkbox visuals stay in sync across browsers.
         renderBaseline();
+      }
+
+      box.setAttribute("role", "checkbox");
+      box.tabIndex = 0;
+      box.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleBaselineItem();
+      });
+      box.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          toggleBaselineItem();
+        }
       });
 
       labelInput.addEventListener("click", e => e.stopPropagation());
@@ -1922,7 +1927,7 @@
       // Native label→checkbox association handles the toggle automatically.
       // No manual click handler needed — would cause double-toggle (click cancels itself).
 
-      lbl.append(cb, box, labelInput);
+      lbl.append(box, labelInput);
 
       const controls = document.createElement("div");
       controls.className = "baseline-row-controls";
