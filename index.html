@@ -2869,6 +2869,49 @@
     function startLiveSync() {
       if (liveSyncStarted) return;
       liveSyncStarted = true;
+      let typingLockUntil = 0;
+      let typingTimer = null;
+      let pendingExternalRefresh = false;
+      let inComposition = false;
+
+      function isTextEditingElement(el) {
+        if (!el) return false;
+        const tag = el.tagName;
+        return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+      }
+
+      function markTypingActivity() {
+        typingLockUntil = Date.now() + 900;
+        if (typingTimer) clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+          if (inComposition) return;
+          if (Date.now() >= typingLockUntil && pendingExternalRefresh) {
+            pendingExternalRefresh = false;
+            refreshFromStorageAndRender();
+          }
+        }, 950);
+      }
+
+      function shouldDeferRefreshWhileTyping() {
+        const active = document.activeElement;
+        return isTextEditingElement(active) && (inComposition || Date.now() < typingLockUntil);
+      }
+
+      document.addEventListener("input", (e) => {
+        if (isTextEditingElement(e.target)) markTypingActivity();
+      }, true);
+      document.addEventListener("compositionstart", (e) => {
+        if (isTextEditingElement(e.target)) {
+          inComposition = true;
+          markTypingActivity();
+        }
+      }, true);
+      document.addEventListener("compositionend", (e) => {
+        if (isTextEditingElement(e.target)) {
+          inComposition = false;
+          markTypingActivity();
+        }
+      }, true);
 
       function getActiveEditingKeys() {
         const el = document.activeElement;
@@ -2893,6 +2936,10 @@
         if (!e.key) return;
         if (!e.key.startsWith("tt_")) return;
         if (isActivelyEditingKey(e.key)) return;
+        if (shouldDeferRefreshWhileTyping()) {
+          pendingExternalRefresh = true;
+          return;
+        }
         refreshFromStorageAndRender();
       });
 
@@ -2908,6 +2955,10 @@
           if (prev === next) return;
           try { localStorage.setItem(row.key, next); } catch { return; }
           if (isActivelyEditingKey(row.key)) return;
+          if (shouldDeferRefreshWhileTyping()) {
+            pendingExternalRefresh = true;
+            return;
+          }
           refreshFromStorageAndRender();
         })
         .subscribe((status) => {
