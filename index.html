@@ -1643,6 +1643,43 @@
       catch { return fallback; }
     }
 
+    const REMOTE_SYNC_DEBOUNCE_MS = 300;
+    const remoteSyncTimers = new Map();
+
+    function cloneForSync(value) {
+      try { return JSON.parse(JSON.stringify(value)); }
+      catch { return value; }
+    }
+
+    function queueCloudUpsert(key, value) {
+      const existing = remoteSyncTimers.get(key);
+      if (existing) clearTimeout(existing);
+      const snapshot = cloneForSync(value);
+      const timer = setTimeout(async () => {
+        remoteSyncTimers.delete(key);
+        if (!currentUser) return;
+        try {
+          const { error } = await sb
+            .from('app_data')
+            .upsert(
+              { user_id: currentUser.id, key, value: snapshot },
+              { onConflict: 'user_id,key' }
+            );
+          if (error) {
+            console.error('Supabase upsert failed (scoped):', key, error);
+            // Backward-compatible fallback for older schemas without user_id / unique(user_id,key)
+            const { error: legacyErr } = await sb.from('app_data').upsert({ key, value: snapshot });
+            if (legacyErr) {
+              console.error('Supabase upsert failed (legacy fallback):', key, legacyErr);
+            }
+          }
+        } catch (err) {
+          console.error('Supabase upsert exception:', key, err);
+        }
+      }, REMOTE_SYNC_DEBOUNCE_MS);
+      remoteSyncTimers.set(key, timer);
+    }
+
     function save(key, val) {
       try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
       // Keep today's baseline definition in sync with the master list
@@ -1651,52 +1688,20 @@
       }
       // Sync to Supabase (fire and forget — localStorage is the source of truth for speed)
       if (currentUser) {
-        (async () => {
-          try {
-            const { error } = await sb
-              .from('app_data')
-              .upsert(
-                { user_id: currentUser.id, key, value: val },
-                { onConflict: 'user_id,key' }
-              );
-            if (error) {
-              console.error('Supabase upsert failed (scoped):', key, error);
-              // Backward-compatible fallback for older schemas without user_id / unique(user_id,key)
-              const { error: legacyErr } = await sb.from('app_data').upsert({ key, value: val });
-              if (legacyErr) {
-                console.error('Supabase upsert failed (legacy fallback):', key, legacyErr);
-              }
-            }
-          } catch (err) {
-            console.error('Supabase upsert exception:', key, err);
-          }
-        })();
+        queueCloudUpsert(key, val);
         if (key === 'tt_baseline_items') {
-          (async () => {
-            try {
-              const { error } = await sb
-                .from('app_data')
-                .upsert(
-                  { user_id: currentUser.id, key: K.baselineDef, value: val },
-                  { onConflict: 'user_id,key' }
-                );
-              if (error) {
-                console.error('Supabase upsert failed (scoped baselineDef):', error);
-                const { error: legacyErr } = await sb.from('app_data').upsert({ key: K.baselineDef, value: val });
-                if (legacyErr) {
-                  console.error('Supabase upsert failed (legacy baselineDef fallback):', legacyErr);
-                }
-              }
-            } catch (err) {
-              console.error('Supabase upsert exception (baselineDef):', err);
-            }
-          })();
+          queueCloudUpsert(K.baselineDef, val);
         }
       }
     }
 
     function removeItem(key) {
       localStorage.removeItem(key);
+      const pending = remoteSyncTimers.get(key);
+      if (pending) {
+        clearTimeout(pending);
+        remoteSyncTimers.delete(key);
+      }
       if (currentUser) {
         (async () => {
           try {
@@ -2865,9 +2870,24 @@
       if (liveSyncStarted) return;
       liveSyncStarted = true;
 
+      function getActiveEditingKey() {
+        const el = document.activeElement;
+        if (!el) return null;
+        if (el.id === "must-win") return K.mustWin;
+        if (el.id === "secondary-1" || el.id === "secondary-2") return K.secondary;
+        if (el.id === "notes-textarea") return K.notes;
+        if (el.id === "waiting-input") return K.waiting;
+        if (el.id === "task-quick-input") return K.tasks;
+        if (el.classList && el.classList.contains("task-label-input")) return K.tasks;
+        if (el.classList && (el.classList.contains("project-name-input") || el.classList.contains("project-action-input"))) return K.projects;
+        if (el.classList && el.classList.contains("baseline-label-input")) return K.baselineItems;
+        return null;
+      }
+
       window.addEventListener("storage", (e) => {
         if (!e.key) return;
         if (!e.key.startsWith("tt_")) return;
+        if (getActiveEditingKey() === e.key) return;
         refreshFromStorageAndRender();
       });
 
@@ -2882,6 +2902,7 @@
           const prev = localStorage.getItem(row.key);
           if (prev === next) return;
           try { localStorage.setItem(row.key, next); } catch { return; }
+          if (getActiveEditingKey() === row.key) return;
           refreshFromStorageAndRender();
         })
         .subscribe((status) => {
