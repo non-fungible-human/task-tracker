@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Task Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
@@ -627,7 +628,7 @@
     .btn-add-task:hover { border-color: var(--accent); color: var(--accent); }
 
     .history-title,
-    #pin-title,
+    #auth-title,
     .day-date {
       font-family: "Syne", "Avenir Next", sans-serif;
     }
@@ -952,8 +953,8 @@
       color: var(--muted);
     }
 
-    /* ── PIN OVERLAY ── */
-    #pin-overlay {
+    /* ── AUTH OVERLAY ── */
+    #auth-overlay {
       position: fixed; inset: 0;
       background:
         radial-gradient(900px 600px at 20% 120%, rgba(20, 184, 166, 0.12), transparent 55%),
@@ -965,22 +966,22 @@
       justify-content: center;
       padding: 24px;
     }
-    #pin-card {
-      background: linear-gradient(145deg, rgba(18, 32, 56, 0.9), rgba(10, 20, 38, 0.95));
+    #auth-card {
+      background: linear-gradient(145deg, rgba(18, 32, 56, 0.92), rgba(10, 20, 38, 0.96));
       border: 1px solid rgba(45, 212, 191, 0.2);
       border-radius: 28px;
-      padding: 44px 36px 36px;
-      width: 100%; max-width: 340px;
+      padding: 48px 40px 40px;
+      width: 100%; max-width: 400px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 28px;
+      gap: 0;
       text-align: center;
       box-shadow: 0 32px 64px rgba(2, 8, 18, 0.6), 0 0 0 1px rgba(255,255,255,0.04) inset;
       backdrop-filter: blur(12px);
     }
-    #pin-title {
-      font-size: 1.6rem;
+    #auth-title {
+      font-size: 1.7rem;
       font-weight: 700;
       letter-spacing: -0.02em;
       font-family: "Syne", sans-serif;
@@ -988,82 +989,126 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      margin-bottom: 8px;
     }
-    #pin-subtitle {
+    #auth-subtitle {
       font-size: 0.88rem;
       color: var(--muted);
-      letter-spacing: 0.02em;
-      margin-top: -20px;
+      letter-spacing: 0.01em;
+      margin-bottom: 36px;
+      line-height: 1.5;
     }
-    #pin-dots {
-      display: flex;
-      gap: 18px;
-    }
-    .pin-dot {
-      width: 16px; height: 16px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      background: transparent;
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    .pin-dot.filled {
-      background: var(--accent);
-      border-color: var(--accent);
-      box-shadow: 0 0 14px rgba(20, 184, 166, 0.7);
-      transform: scale(1.15);
-    }
-    .pin-dot.error {
-      background: var(--danger);
-      border-color: var(--danger);
-      box-shadow: 0 0 14px rgba(239, 68, 68, 0.6);
-    }
-    #pin-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
+
+    /* Password step */
+    #auth-step-password { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    #auth-password-input {
       width: 100%;
-    }
-    .pin-key {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.09);
-      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
       color: var(--text);
-      font-family: "JetBrains Mono", monospace;
-      font-size: 1.4rem;
-      font-weight: 500;
-      padding: 18px 12px;
-      cursor: pointer;
-      transition: all 0.12s ease;
-      user-select: none;
-      letter-spacing: -0.02em;
-    }
-    .pin-key:hover {
-      background: rgba(20, 184, 166, 0.12);
-      border-color: rgba(20, 184, 166, 0.4);
-      color: var(--accent);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
-    }
-    .pin-key:active {
-      transform: scale(0.95);
-      background: rgba(20, 184, 166, 0.18);
-    }
-    .pin-key.del {
       font-family: inherit;
-      font-size: 1.2rem;
-      color: var(--muted);
+      font-size: 1.05rem;
+      padding: 15px 18px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.1em;
+      text-align: center;
     }
-    .pin-key[data-n=""] {
-      background: transparent;
-      border-color: transparent;
-      pointer-events: none;
+    #auth-password-input::placeholder { color: var(--dim); letter-spacing: 0.02em; font-size: 0.95rem; }
+    #auth-password-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
     }
-    #pin-msg {
+    #auth-continue-btn {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      border-radius: 14px;
+      color: #021a18;
+      font-family: "Syne", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 15px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+    #auth-continue-btn:hover { opacity: 0.88; }
+    #auth-continue-btn:active { transform: scale(0.98); }
+    #auth-continue-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    #auth-error {
       font-size: 0.82rem;
       color: var(--danger);
       min-height: 1.2em;
-      letter-spacing: 0.02em;
+      text-align: center;
     }
+
+    /* Sent step */
+    #auth-step-sent {
+      width: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    #auth-sent-icon {
+      font-size: 3rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 16px rgba(20, 184, 166, 0.5));
+    }
+    #auth-sent-title {
+      font-family: "Syne", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    #auth-sent-body {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    #auth-sent-body strong { color: var(--accent); font-weight: 600; }
+    #auth-resend-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.82rem;
+      padding: 8px 20px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 4px;
+    }
+    #auth-resend-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #auth-back-btn {
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-family: inherit;
+      font-size: 0.78rem;
+      cursor: pointer;
+      padding: 4px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    #auth-back-btn:hover { color: var(--muted); }
+
+    /* Sign out button */
+    .signout-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--dim);
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-family: inherit;
+      padding: 4px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .signout-btn:hover { border-color: var(--danger); color: var(--danger); }
 
     /* ── GLOBAL TYPE SCALE OVERRIDE ── */
     html { font-size: 17px; }
@@ -1266,32 +1311,32 @@
 </head>
 <body>
 
-  <!-- PIN OVERLAY -->
-  <div id="pin-overlay">
-    <div id="pin-card">
-      <div id="pin-title">Task Tracker</div>
-      <div id="pin-subtitle">Enter your PIN</div>
-      <div id="pin-dots">
-        <span class="pin-dot"></span>
-        <span class="pin-dot"></span>
-        <span class="pin-dot"></span>
-        <span class="pin-dot"></span>
+  <!-- AUTH OVERLAY -->
+  <div id="auth-overlay">
+    <div id="auth-card">
+      <div id="auth-title">Task Tracker</div>
+      <div id="auth-subtitle">Enter your password to continue</div>
+
+      <!-- Step 1: Password -->
+      <div id="auth-step-password">
+        <input type="password" id="auth-password-input" placeholder="Password" autocomplete="current-password">
+        <button id="auth-continue-btn">Continue →</button>
+        <div id="auth-error"></div>
       </div>
-      <div id="pin-grid">
-        <button class="pin-key" data-n="1">1</button>
-        <button class="pin-key" data-n="2">2</button>
-        <button class="pin-key" data-n="3">3</button>
-        <button class="pin-key" data-n="4">4</button>
-        <button class="pin-key" data-n="5">5</button>
-        <button class="pin-key" data-n="6">6</button>
-        <button class="pin-key" data-n="7">7</button>
-        <button class="pin-key" data-n="8">8</button>
-        <button class="pin-key" data-n="9">9</button>
-        <button class="pin-key" data-n=""></button>
-        <button class="pin-key" data-n="0">0</button>
-        <button class="pin-key del" data-n="del">⌫</button>
+
+      <!-- Step 2: Email sent -->
+      <div id="auth-step-sent">
+        <div id="auth-sent-icon">✉️</div>
+        <div id="auth-sent-title">Check your email</div>
+        <div id="auth-sent-body">
+          A login link was sent to<br>
+          <strong>zigoulasandreas@gmail.com</strong><br><br>
+          Click the link in the email to sign in.<br>
+          You can close this tab while you wait.
+        </div>
+        <button id="auth-resend-btn">Resend link</button>
+        <button id="auth-back-btn">← Back</button>
       </div>
-      <div id="pin-msg"></div>
     </div>
   </div>
 
@@ -1300,6 +1345,7 @@
       <div class="header-left">
         <span class="date-display" id="date-display"></span>
         <button class="history-btn" id="history-btn">History</button>
+        <button class="signout-btn" id="signout-btn">Sign out</button>
       </div>
       <div class="mode-selector" id="mode-selector">
         <button class="mode-pill" data-mode="build">Build</button>
@@ -1396,78 +1442,128 @@
   </div>
 
   <script>
-    // ── PIN AUTH ──────────────────────────────────────────────────────────────
-    const PIN_KEY = 'tt_pin';
-    let pinBuffer = '';
+    // ── SUPABASE AUTH ─────────────────────────────────────────────────────────
+    const SUPABASE_URL      = 'https://izxdheoqmmiqyulpkrgh.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6eGRoZW9xbW1pcXl1bHBrcmdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzI4ODYsImV4cCI6MjA5Mjk0ODg4Nn0.UhdaO9gtFHC1nZjk9aKoqmIK3PuEueecVn2un-MY6i0';
+    const OWNER_EMAIL       = 'zigoulasandreas@gmail.com';
+    const REDIRECT_URL      = 'https://non-fungible-human.github.io/task-tracker/';
+    const PWD_KEY           = 'tt_auth_pwd';
 
-    async function hashPin(pin) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function hashPassword(pwd) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
       return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    function updateDots(len, isError) {
-      document.querySelectorAll('.pin-dot').forEach((dot, i) => {
-        dot.classList.toggle('filled', !isError && i < len);
-        dot.classList.toggle('error', isError);
-      });
+    function showAuthOverlay() {
+      const overlay = document.getElementById('auth-overlay');
+      overlay.style.display = 'flex';
+      showPasswordStep();
     }
 
-    async function handlePin(digit) {
-      if (digit === 'del') {
-        pinBuffer = pinBuffer.slice(0, -1);
-        updateDots(pinBuffer.length, false);
-        return;
-      }
-      if (digit === '' || pinBuffer.length >= 4) return;
-      pinBuffer += digit;
-      updateDots(pinBuffer.length, false);
+    function hideAuthOverlay() {
+      document.getElementById('auth-overlay').style.display = 'none';
+    }
 
-      if (pinBuffer.length < 4) return;
+    function showPasswordStep() {
+      document.getElementById('auth-step-password').style.display = 'flex';
+      document.getElementById('auth-step-sent').style.display = 'none';
+      document.getElementById('auth-error').textContent = '';
+      document.getElementById('auth-password-input').value = '';
+      const stored = localStorage.getItem(PWD_KEY);
+      document.getElementById('auth-subtitle').textContent = stored
+        ? 'Enter your password to continue'
+        : 'Create a password to secure your tracker';
+      document.getElementById('auth-continue-btn').textContent = stored ? 'Continue →' : 'Set Password →';
+      setTimeout(() => document.getElementById('auth-password-input').focus(), 80);
+    }
 
-      const stored = localStorage.getItem(PIN_KEY);
-      const hash = await hashPin(pinBuffer);
+    function showSentStep() {
+      document.getElementById('auth-step-password').style.display = 'none';
+      document.getElementById('auth-step-sent').style.display = 'flex';
+      document.getElementById('auth-subtitle').textContent = '';
+    }
+
+    async function sendMagicLink() {
+      const { error } = await sb.auth.signInWithOtp({
+        email: OWNER_EMAIL,
+        options: { emailRedirectTo: REDIRECT_URL }
+      });
+      return error;
+    }
+
+    document.getElementById('auth-continue-btn').addEventListener('click', async () => {
+      const pwd = document.getElementById('auth-password-input').value;
+      if (!pwd) return;
+
+      const btn = document.getElementById('auth-continue-btn');
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+
+      const hash = await hashPassword(pwd);
+      const stored = localStorage.getItem(PWD_KEY);
 
       if (!stored) {
-        // First time — set PIN
-        localStorage.setItem(PIN_KEY, hash);
-        sessionStorage.setItem('tt_unlocked', '1');
-        document.getElementById('pin-overlay').style.display = 'none';
-        initApp();
-      } else if (hash === stored) {
-        sessionStorage.setItem('tt_unlocked', '1');
-        document.getElementById('pin-overlay').style.display = 'none';
+        // First time — store password
+        localStorage.setItem(PWD_KEY, hash);
+      } else if (hash !== stored) {
+        document.getElementById('auth-error').textContent = 'Incorrect password.';
+        btn.disabled = false;
+        btn.textContent = 'Continue →';
+        document.getElementById('auth-password-input').select();
+        return;
+      }
+
+      btn.textContent = 'Sending email…';
+      const error = await sendMagicLink();
+      if (error) {
+        document.getElementById('auth-error').textContent = error.message;
+        btn.disabled = false;
+        btn.textContent = 'Continue →';
+      } else {
+        showSentStep();
+      }
+    });
+
+    document.getElementById('auth-password-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('auth-continue-btn').click();
+    });
+
+    document.getElementById('auth-resend-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('auth-resend-btn');
+      btn.textContent = 'Sending…';
+      btn.disabled = true;
+      await sendMagicLink();
+      btn.textContent = 'Sent ✓';
+      setTimeout(() => { btn.textContent = 'Resend link'; btn.disabled = false; }, 3000);
+    });
+
+    document.getElementById('auth-back-btn').addEventListener('click', showPasswordStep);
+
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+    });
+
+    // ── SESSION HANDLING ──────────────────────────────────────────────────────
+    sb.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        hideAuthOverlay();
         initApp();
       } else {
-        updateDots(4, true);
-        document.getElementById('pin-msg').textContent = 'Incorrect PIN';
-        setTimeout(() => {
-          pinBuffer = '';
-          updateDots(0, false);
-          document.getElementById('pin-msg').textContent = '';
-        }, 800);
+        showAuthOverlay();
       }
-    }
-
-    document.querySelectorAll('.pin-key').forEach(btn => {
-      btn.addEventListener('click', () => handlePin(btn.dataset.n));
     });
 
-    document.addEventListener('keydown', e => {
-      if (document.getElementById('pin-overlay').style.display === 'none') return;
-      if (e.key >= '0' && e.key <= '9') handlePin(e.key);
-      if (e.key === 'Backspace') handlePin('del');
-    });
-
-    // Boot — check if already unlocked this session
-    (function bootPin() {
-      const stored = localStorage.getItem(PIN_KEY);
-      if (sessionStorage.getItem('tt_unlocked') === '1') {
-        document.getElementById('pin-overlay').style.display = 'none';
+    // Check session on load (handles magic link redirect too)
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        hideAuthOverlay();
         initApp();
-      } else if (!stored) {
-        document.getElementById('pin-subtitle').textContent = 'Choose a 4-digit PIN';
+      } else {
+        showAuthOverlay();
       }
-    })();
+    });
 
     // ── DATE ──────────────────────────────────────────────────────────────────
     const TODAY = new Date().toISOString().slice(0, 10);
