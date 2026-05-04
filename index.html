@@ -1793,11 +1793,8 @@
         save(K.baselineItems, state.baselineItems);
       });
 
-      lbl.addEventListener("click", e => {
-        if (e.target === labelInput) return;
-        cb.checked = !cb.checked;
-        cb.dispatchEvent(new Event("change"));
-      });
+      // Native label→checkbox association handles the toggle automatically.
+      // No manual click handler needed — would cause double-toggle (click cancels itself).
 
       lbl.append(cb, box, labelInput);
 
