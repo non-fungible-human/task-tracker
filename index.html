@@ -1555,10 +1555,10 @@
           return;
         }
         currentUser = session.user;
-        hideAuthOverlay();
         initApp();
       } else {
         currentUser = null;
+        appInitialized = false;
         showAuthOverlay();
       }
     }
@@ -1621,19 +1621,23 @@
 
     // ── APP INIT ──────────────────────────────────────────────────────────────
     let appInitialized = false;
-    async function initApp() {
+    function initApp() {
       if (appInitialized) return;
       appInitialized = true;
 
-      // Pull latest data from Supabase and seed localStorage
-      try {
-        const { data } = await sb.from('app_data').select('key,value');
-        if (data && data.length > 0) {
-          data.forEach(({ key, value }) => {
-            try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-          });
-        }
-      } catch { /* offline — fall through to localStorage */ }
+      // Sync from Supabase in background — non-blocking.
+      // Updates localStorage so the NEXT page load gets fresh data.
+      // Does not delay UI init or event listener setup.
+      if (currentUser) {
+        sb.from('app_data').select('key,value')
+          .then(({ data }) => {
+            if (!data) return;
+            data.forEach(({ key, value }) => {
+              try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+            });
+          })
+          .catch(() => {});
+      }
 
     // ── STATE ─────────────────────────────────────────────────────────────────
     const state = {
@@ -2689,6 +2693,7 @@
     renderWaiting();
     renderTasks();
     renderCloseCard();
+    hideAuthOverlay(); // Show UI only after all event listeners and renders are ready
     } // end initApp
   </script>
 </body>
