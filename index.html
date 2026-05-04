@@ -1598,7 +1598,10 @@
       }
     }
 
-    sb.auth.onAuthStateChange((_event, session) => handleSession(session));
+    sb.auth.onAuthStateChange((_event, session) => {
+      // Let Supabase finish internal auth processing before we touch other queries.
+      setTimeout(() => handleSession(session), 0);
+    });
 
     // Check session on load (also handles magic link redirect token in URL)
     sb.auth.getSession().then(({ data: { session } }) => handleSession(session));
@@ -1657,7 +1660,7 @@
 
     // ── APP INIT ──────────────────────────────────────────────────────────────
     let appInitialized = false;
-    function initApp() {
+    async function initApp() {
       if (appInitialized) return;
       appInitialized = true;
 
@@ -1682,6 +1685,35 @@
       closed:    load(K.closed, null),
       notes:     load(K.notes, ""),
     };
+
+    async function hydrateFromSupabase() {
+      if (!currentUser) return;
+      try {
+        const { data, error } = await sb
+          .from('app_data')
+          .select('key, value');
+        if (error || !Array.isArray(data)) return;
+        data.forEach(row => {
+          if (!row || typeof row.key !== 'string') return;
+          try { localStorage.setItem(row.key, JSON.stringify(row.value)); } catch {}
+        });
+      } catch {}
+    }
+
+    await hydrateFromSupabase();
+
+    // Re-read state after cloud hydration so UI reflects latest saved data immediately.
+    state.mode = load(K.mode, null);
+    state.mustWin = load(K.mustWin, "");
+    state.secondary = load(K.secondary, ["", ""]);
+    state.baselineItems = load(K.baselineItems, state.baselineItems);
+    state.baseline = load(K.baseline, {});
+    state.eod = load(K.eod, { body: null, work: null, project: null, mind: null, people: null });
+    state.projects = load(K.projects, []);
+    state.waiting = load(K.waiting, []);
+    state.tasks = load(K.tasks, []);
+    state.closed = load(K.closed, null);
+    state.notes = load(K.notes, "");
 
     // ── SNAPSHOT TODAY'S BASELINE DEFINITION ──────────────────────────────────
     if (load(K.baselineDef, null) === null) {
