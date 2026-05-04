@@ -2870,24 +2870,29 @@
       if (liveSyncStarted) return;
       liveSyncStarted = true;
 
-      function getActiveEditingKey() {
+      function getActiveEditingKeys() {
         const el = document.activeElement;
-        if (!el) return null;
-        if (el.id === "must-win") return K.mustWin;
-        if (el.id === "secondary-1" || el.id === "secondary-2") return K.secondary;
-        if (el.id === "notes-textarea") return K.notes;
-        if (el.id === "waiting-input") return K.waiting;
-        if (el.id === "task-quick-input") return K.tasks;
-        if (el.classList && el.classList.contains("task-label-input")) return K.tasks;
-        if (el.classList && (el.classList.contains("project-name-input") || el.classList.contains("project-action-input"))) return K.projects;
-        if (el.classList && el.classList.contains("baseline-label-input")) return K.baselineItems;
-        return null;
+        if (!el) return [];
+        if (el.id === "must-win") return [K.mustWin];
+        if (el.id === "secondary-1" || el.id === "secondary-2") return [K.secondary];
+        if (el.id === "notes-textarea") return [K.notes];
+        if (el.id === "waiting-input") return [K.waiting];
+        if (el.id === "task-quick-input") return [K.tasks];
+        if (el.classList && el.classList.contains("task-label-input")) return [K.tasks];
+        if (el.classList && (el.classList.contains("project-name-input") || el.classList.contains("project-action-input"))) return [K.projects];
+        // Baseline label editing updates both master list and today's snapshot.
+        if (el.classList && el.classList.contains("baseline-label-input")) return [K.baselineItems, K.baselineDef];
+        return [];
+      }
+
+      function isActivelyEditingKey(key) {
+        return getActiveEditingKeys().includes(key);
       }
 
       window.addEventListener("storage", (e) => {
         if (!e.key) return;
         if (!e.key.startsWith("tt_")) return;
-        if (getActiveEditingKey() === e.key) return;
+        if (isActivelyEditingKey(e.key)) return;
         refreshFromStorageAndRender();
       });
 
@@ -2902,7 +2907,7 @@
           const prev = localStorage.getItem(row.key);
           if (prev === next) return;
           try { localStorage.setItem(row.key, next); } catch { return; }
-          if (getActiveEditingKey() === row.key) return;
+          if (isActivelyEditingKey(row.key)) return;
           refreshFromStorageAndRender();
         })
         .subscribe((status) => {
