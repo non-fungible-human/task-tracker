@@ -1651,30 +1651,46 @@
       }
       // Sync to Supabase (fire and forget — localStorage is the source of truth for speed)
       if (currentUser) {
-        sb.from('app_data')
-          .upsert(
-            { user_id: currentUser.id, key, value: val },
-            { onConflict: 'user_id,key' }
-          )
-          .catch((err) => {
-            console.error('Supabase upsert failed (scoped):', key, err);
-            // Backward-compatible fallback for older schemas without user_id / unique(user_id,key)
-            sb.from('app_data').upsert({ key, value: val }).catch((legacyErr) => {
-              console.error('Supabase upsert failed (legacy fallback):', key, legacyErr);
-            });
-          });
+        (async () => {
+          try {
+            const { error } = await sb
+              .from('app_data')
+              .upsert(
+                { user_id: currentUser.id, key, value: val },
+                { onConflict: 'user_id,key' }
+              );
+            if (error) {
+              console.error('Supabase upsert failed (scoped):', key, error);
+              // Backward-compatible fallback for older schemas without user_id / unique(user_id,key)
+              const { error: legacyErr } = await sb.from('app_data').upsert({ key, value: val });
+              if (legacyErr) {
+                console.error('Supabase upsert failed (legacy fallback):', key, legacyErr);
+              }
+            }
+          } catch (err) {
+            console.error('Supabase upsert exception:', key, err);
+          }
+        })();
         if (key === 'tt_baseline_items') {
-          sb.from('app_data')
-            .upsert(
-              { user_id: currentUser.id, key: K.baselineDef, value: val },
-              { onConflict: 'user_id,key' }
-            )
-            .catch((err) => {
-              console.error('Supabase upsert failed (scoped baselineDef):', err);
-              sb.from('app_data').upsert({ key: K.baselineDef, value: val }).catch((legacyErr) => {
-                console.error('Supabase upsert failed (legacy baselineDef fallback):', legacyErr);
-              });
-            });
+          (async () => {
+            try {
+              const { error } = await sb
+                .from('app_data')
+                .upsert(
+                  { user_id: currentUser.id, key: K.baselineDef, value: val },
+                  { onConflict: 'user_id,key' }
+                );
+              if (error) {
+                console.error('Supabase upsert failed (scoped baselineDef):', error);
+                const { error: legacyErr } = await sb.from('app_data').upsert({ key: K.baselineDef, value: val });
+                if (legacyErr) {
+                  console.error('Supabase upsert failed (legacy baselineDef fallback):', legacyErr);
+                }
+              }
+            } catch (err) {
+              console.error('Supabase upsert exception (baselineDef):', err);
+            }
+          })();
         }
       }
     }
@@ -1682,16 +1698,24 @@
     function removeItem(key) {
       localStorage.removeItem(key);
       if (currentUser) {
-        sb.from('app_data')
-          .delete()
-          .eq('user_id', currentUser.id)
-          .eq('key', key)
-          .catch((err) => {
-            console.error('Supabase delete failed (scoped):', key, err);
-            sb.from('app_data').delete().eq('key', key).catch((legacyErr) => {
-              console.error('Supabase delete failed (legacy fallback):', key, legacyErr);
-            });
-          });
+        (async () => {
+          try {
+            const { error } = await sb
+              .from('app_data')
+              .delete()
+              .eq('user_id', currentUser.id)
+              .eq('key', key);
+            if (error) {
+              console.error('Supabase delete failed (scoped):', key, error);
+              const { error: legacyErr } = await sb.from('app_data').delete().eq('key', key);
+              if (legacyErr) {
+                console.error('Supabase delete failed (legacy fallback):', key, legacyErr);
+              }
+            }
+          } catch (err) {
+            console.error('Supabase delete exception:', key, err);
+          }
+        })();
       }
     }
 
