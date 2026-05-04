@@ -1450,6 +1450,7 @@
     const PWD_KEY           = 'tt_auth_pwd';
 
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentUser = null;
 
     async function hashPassword(pwd) {
       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
@@ -1546,24 +1547,26 @@
     });
 
     // ── SESSION HANDLING ──────────────────────────────────────────────────────
-    sb.auth.onAuthStateChange((event, session) => {
+    function handleSession(session) {
       if (session) {
+        // Hard block — only the owner email can ever use the app
+        if (session.user.email !== OWNER_EMAIL) {
+          sb.auth.signOut();
+          return;
+        }
+        currentUser = session.user;
         hideAuthOverlay();
         initApp();
       } else {
+        currentUser = null;
         showAuthOverlay();
       }
-    });
+    }
 
-    // Check session on load (handles magic link redirect too)
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        hideAuthOverlay();
-        initApp();
-      } else {
-        showAuthOverlay();
-      }
-    });
+    sb.auth.onAuthStateChange((_event, session) => handleSession(session));
+
+    // Check session on load (also handles magic link redirect token in URL)
+    sb.auth.getSession().then(({ data: { session } }) => handleSession(session));
 
     // ── DATE ──────────────────────────────────────────────────────────────────
     const TODAY = new Date().toISOString().slice(0, 10);
@@ -1600,17 +1603,37 @@
       if (key === 'tt_baseline_items') {
         try { localStorage.setItem(K.baselineDef, JSON.stringify(val)); } catch {}
       }
+      // Sync to Supabase (fire and forget — localStorage is the source of truth for speed)
+      if (currentUser) {
+        sb.from('app_data').upsert({ key, value: val }).catch(() => {});
+        if (key === 'tt_baseline_items') {
+          sb.from('app_data').upsert({ key: K.baselineDef, value: val }).catch(() => {});
+        }
+      }
     }
 
     function removeItem(key) {
       localStorage.removeItem(key);
+      if (currentUser) {
+        sb.from('app_data').delete().eq('key', key).catch(() => {});
+      }
     }
 
     // ── APP INIT ──────────────────────────────────────────────────────────────
     let appInitialized = false;
-    function initApp() {
+    async function initApp() {
       if (appInitialized) return;
       appInitialized = true;
+
+      // Pull latest data from Supabase and seed localStorage
+      try {
+        const { data } = await sb.from('app_data').select('key,value');
+        if (data && data.length > 0) {
+          data.forEach(({ key, value }) => {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+          });
+        }
+      } catch { /* offline — fall through to localStorage */ }
 
     // ── STATE ─────────────────────────────────────────────────────────────────
     const state = {
