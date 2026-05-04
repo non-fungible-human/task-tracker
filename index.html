@@ -1486,6 +1486,8 @@
 
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentUser = null;
+    let liveSyncStarted = false;
+    let cloudChannel = null;
 
     async function hashPassword(pwd) {
       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
@@ -1594,6 +1596,11 @@
       } else {
         currentUser = null;
         appInitialized = false;
+        liveSyncStarted = false;
+        if (cloudChannel) {
+          sb.removeChannel(cloudChannel);
+          cloudChannel = null;
+        }
         showAuthOverlay();
       }
     }
@@ -1685,6 +1692,35 @@
       closed:    load(K.closed, null),
       notes:     load(K.notes, ""),
     };
+
+    function refreshFromStorageAndRender() {
+      state.mode = load(K.mode, null);
+      state.mustWin = load(K.mustWin, "");
+      state.secondary = load(K.secondary, ["", ""]);
+      state.baselineItems = load(K.baselineItems, state.baselineItems);
+      state.baseline = load(K.baseline, {});
+      state.eod = load(K.eod, { body: null, work: null, project: null, mind: null, people: null });
+      state.projects = load(K.projects, []);
+      state.waiting = load(K.waiting, []);
+      state.tasks = load(K.tasks, []);
+      state.closed = load(K.closed, null);
+      state.notes = load(K.notes, "");
+
+      document.querySelectorAll(".mode-pill").forEach(p =>
+        p.classList.toggle("active", p.dataset.mode === state.mode)
+      );
+      mustWinEl.value = state.mustWin;
+      document.getElementById("secondary-1").value = state.secondary[0] || "";
+      document.getElementById("secondary-2").value = state.secondary[1] || "";
+      notesEl.value = state.notes || "";
+
+      renderBaseline();
+      renderProjects();
+      renderWaiting();
+      renderTasks();
+      renderCloseCard();
+      if (historyOverlay.classList.contains("open")) renderHistory();
+    }
 
     async function hydrateFromSupabase() {
       if (!currentUser) return;
@@ -2747,12 +2783,38 @@
       save(K.notes, state.notes);
     });
 
+    function startLiveSync() {
+      if (liveSyncStarted) return;
+      liveSyncStarted = true;
+
+      window.addEventListener("storage", (e) => {
+        if (!e.key) return;
+        if (!e.key.startsWith("tt_")) return;
+        refreshFromStorageAndRender();
+      });
+
+      cloudChannel = sb
+        .channel('app_data_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, (payload) => {
+          const row = payload && payload.new ? payload.new : null;
+          if (!row || typeof row.key !== 'string') return;
+          let next;
+          try { next = JSON.stringify(row.value); } catch { return; }
+          const prev = localStorage.getItem(row.key);
+          if (prev === next) return;
+          try { localStorage.setItem(row.key, next); } catch { return; }
+          refreshFromStorageAndRender();
+        })
+        .subscribe();
+    }
+
     // ── INIT ──────────────────────────────────────────────────────────────────
     renderBaseline();
     renderProjects();
     renderWaiting();
     renderTasks();
     renderCloseCard();
+    startLiveSync();
     hideAuthOverlay(); // Show UI only after all event listeners and renders are ready
     } // end initApp
   </script>
